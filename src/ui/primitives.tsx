@@ -228,3 +228,11 @@ export function Section({
     </section>
   );
 }
+
+// shared styling for dropdown menu surfaces
+export const MENU_CLASS =
+  'z-[1000] min-w-52 rounded-xl border border-line-strong bg-raised p-1 text-xs text-fg shadow-xl shadow-black/50';
+
+// shared styling for one row of a dropdown menu
+export const ITEM_CLASS =
+  'flex h-7 cursor-default items-center justify-between gap-6 rounded-lg px-2 outline-none data-[disabled]:opacity-40 data-[highlighted]:bg-hover';

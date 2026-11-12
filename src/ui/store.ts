@@ -5,18 +5,18 @@ import type { PaintTargetMode } from '../editor/paint-target';
 import type { FileRef } from '../platform/platform';
 import { allVisible, type Visibility } from '../renderer/skin-object';
 
-// content a view area can show, chosen independently for each of the two areas
+// content a view tab can show, chosen when the tab is opened
 export type ViewKind = '3d' | '2d' | 'parts' | 'render' | 'browser' | 'namemc';
 
-// the two dockable view areas of the workspace
-export type SlotId = 'a' | 'b';
-
-// every view kind in the order the view switcher lists them
+// every view kind a saved session may contain
 export const VIEW_KINDS: readonly ViewKind[] = ['3d', '2d', 'parts', 'render', 'browser', 'namemc'];
 
-// captions for view kinds, shared by the switcher and the dock tabs
+// view kinds offered by the new tab menu, namemc stays implemented but is not offered yet
+export const NEW_VIEW_KINDS: readonly ViewKind[] = ['2d', 'parts', '3d', 'render', 'browser'];
+
+// captions for view kinds, shared by the new tab menu and the dock tabs
 export const VIEW_LABELS: Record<ViewKind, string> = {
-  '3d': '3D',
+  '3d': '3D Preview',
   '2d': '2D',
   parts: '2D Parts',
   render: '3D Render',
@@ -51,8 +51,8 @@ export interface Notice {
 
 // interface state only, the skin itself lives in the editor core
 interface UiState {
-  views: Record<SlotId, ViewKind>;
-  activeSlot: SlotId;
+  views: Readonly<Record<string, ViewKind>>;
+  activeView: string | null;
   openPanels: readonly string[];
   activeToolId: string;
   color: Rgba;
@@ -67,7 +67,7 @@ interface UiState {
   notice: Notice | null;
   fileRef: FileRef | null;
   set(patch: Partial<UiState>): void;
-  setView(slot: SlotId, kind: ViewKind): void;
+  setView(id: string, kind: ViewKind): void;
   setStudio(patch: Partial<StudioSettings>): void;
   toggleVisibility(part: PartId, layer: LayerId): void;
   setLayerVisibility(layer: LayerId, visible: boolean): void;
@@ -75,28 +75,31 @@ interface UiState {
   notify(kind: Notice['kind'], text: string): void;
 }
 
-// storage key for the view kinds the user last had open
-const VIEWS_KEY = 'skin-studio.views.v1';
+// storage key for the kind of every view tab the user last had open
+const VIEWS_KEY = 'skin-studio.views.v2';
 
 // counter for notice ids so repeated identical messages still re-trigger the toast
 let noticeId = 0;
 
-// restores the last view kinds, falling back to the 3d plus parts pairing of a fresh session
-function loadViews(): Record<SlotId, ViewKind> {
-  const fallback: Record<SlotId, ViewKind> = { a: '3d', b: 'parts' };
+// restores the kinds of the saved view tabs, dropping anything that is not a known kind
+function loadViews(): Record<string, ViewKind> {
+  const views: Record<string, ViewKind> = {};
   try {
-    const saved = JSON.parse(localStorage.getItem(VIEWS_KEY) ?? 'null') as Partial<Record<SlotId, string>>;
-    const pick = (slot: SlotId) => VIEW_KINDS.find((kind) => kind === saved?.[slot]) ?? fallback[slot];
-    return { a: pick('a'), b: pick('b') };
+    const saved = JSON.parse(localStorage.getItem(VIEWS_KEY) ?? '{}') as Record<string, unknown>;
+    for (const [id, value] of Object.entries(saved)) {
+      const kind = VIEW_KINDS.find((item) => item === value);
+      if (kind) views[id] = kind;
+    }
   } catch {
-    return fallback;
+    return {};
   }
+  return views;
 }
 
 // single zustand store for ui state, read by components and by the tool environment
 export const useUi = create<UiState>((set) => ({
   views: loadViews(),
-  activeSlot: 'a',
+  activeView: null,
   openPanels: [],
   activeToolId: 'pencil',
   color: [233, 84, 84, 255],
@@ -119,7 +122,7 @@ export const useUi = create<UiState>((set) => ({
   notice: null,
   fileRef: null,
   set: (patch) => set(patch),
-  setView: (slot, kind) => set((state) => ({ views: { ...state.views, [slot]: kind }, hover: null })),
+  setView: (id, kind) => set((state) => ({ views: { ...state.views, [id]: kind }, hover: null })),
   setStudio: (patch) => set((state) => ({ studio: { ...state.studio, ...patch } })),
   toggleVisibility: (part, layer) =>
     set((state) => ({

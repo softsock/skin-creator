@@ -4,36 +4,39 @@ import { useEffect } from 'react';
 import { viewports } from '../app/app';
 import { BrowserView } from './BrowserView';
 import { IconButton } from './primitives';
-import { useUi, VIEW_LABELS, type SlotId } from './store';
+import { useUi, VIEW_LABELS } from './store';
 import { TextureView } from './TextureView';
 import { Viewport3D } from './Viewport3D';
 
-// one of the two view areas, showing whichever kind of view the user picked for it
-export function ViewSlot({ slot, panel }: { slot: SlotId; panel: DockviewPanelApi }) {
-  const kind = useUi((state) => state.views[slot]);
-  const active = useUi((state) => state.activeSlot === slot);
-  const paired = useUi((state) => state.openPanels.includes('view-a') && state.openPanels.includes('view-b'));
+// content of one view tab, showing whichever kind of view the tab was opened with
+export function ViewSlot({ id, panel }: { id: string; panel: DockviewPanelApi }) {
+  const kind = useUi((state) => state.views[id]);
+  const active = useUi((state) => state.activeView === id);
+  const several = useUi((state) => Object.keys(state.views).length > 1);
   const webglError = useUi((state) => state.webglError);
   const model = kind === '3d' || kind === 'render';
 
-  useEffect(() => panel.setTitle(VIEW_LABELS[kind]), [kind, panel]);
+  useEffect(() => {
+    if (kind) panel.setTitle(VIEW_LABELS[kind]);
+  }, [kind, panel]);
   useEffect(() => {
     const subscription = panel.onDidActiveChange((event) => {
-      if (event.isActive) useUi.getState().set({ activeSlot: slot });
+      if (event.isActive) useUi.getState().set({ activeView: id });
     });
     return () => subscription.dispose();
-  }, [panel, slot]);
+  }, [panel, id]);
 
+  if (!kind) return null;
   return (
     <div
-      data-testid={`view-${slot}`}
+      data-testid={id}
       className="relative h-full w-full overflow-hidden"
       onPointerDownCapture={() => {
-        if (!active) useUi.getState().set({ activeSlot: slot });
+        if (!active) useUi.getState().set({ activeView: id });
       }}
     >
       {model ? (
-        <Viewport3D slot={slot} />
+        <Viewport3D id={id} />
       ) : kind === 'browser' || kind === 'namemc' ? (
         <BrowserView key={kind} kind={kind} />
       ) : (
@@ -46,12 +49,12 @@ export function ViewSlot({ slot, panel }: { slot: SlotId; panel: DockviewPanelAp
             shortcut="0"
             icon={RotateCcw}
             tipSide="right"
-            onClick={() => viewports.get(slot)?.resetCamera()}
+            onClick={() => viewports.get(id)?.resetCamera()}
             className="border border-line bg-panel/90 backdrop-blur-sm"
           />
         </div>
       )}
-      {paired && active && <div className="pointer-events-none absolute inset-0 border border-accent/45" />}
+      {several && active && <div className="pointer-events-none absolute inset-0 border border-accent/45" />}
     </div>
   );
 }
