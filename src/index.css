@@ -1,0 +1,56 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --color-app: #0e0f11;
+  --color-panel: #16171a;
+  --color-raised: #1d1f23;
+  --color-hover: #26282d;
+  --color-line: #25272c;
+  --color-line-strong: #353840;
+  --color-fg: #e7e8eb;
+  --color-muted: #9b9ea7;
+  --color-faint: #686b74;
+  --color-accent: #3ecf8e;
+  --color-accent-fg: #052e1c;
+  --color-danger: #f0616d;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--color-app);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+input {
+  user-select: text;
+}
+
+/* checkerboard shown behind transparent content in the studio and the color swatches */
+.checker {
+  background-color: #1b1c20;
+  background-image:
+    linear-gradient(45deg, #2a2c31 25%, transparent 25%, transparent 75%, #2a2c31 75%),
+    linear-gradient(45deg, #2a2c31 25%, transparent 25%, transparent 75%, #2a2c31 75%);
+  background-position:
+    0 0,
+    8px 8px;
+  background-size: 16px 16px;
+}
+
+/* thin unobtrusive scrollbars for the sidebar */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}

@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-electron
+*.tsbuildinfo
+test-results
+playwright-report
+.hoplite/artifacts
+.hoplite/runtime
+.DS_Store
+*.log

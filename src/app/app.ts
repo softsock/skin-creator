@@ -1,0 +1,58 @@
+import { createDefaultSkin } from '../core/default-skin';
+import { Editor } from '../core/editor';
+import { ToolController } from '../editor/tool-controller';
+import type { Tool } from '../editor/tool';
+import { builtinTools } from '../editor/tools/builtin';
+import type { ActionDefinition, PanelDefinition } from '../extensions/api';
+import { shadingPlugin } from '../extensions/builtin/shading';
+import { ExtensionHost } from '../extensions/host';
+import { Registry } from '../extensions/registry';
+import { detectPlatform } from '../platform/platform';
+import { STUDIO_PRESETS, type LightingPreset } from '../renderer/lighting';
+import type { SkinViewport } from '../renderer/viewport';
+import { useUi } from '../ui/store';
+
+// the one editor instance of the running application
+export const editor = new Editor({
+  pixels: createDefaultSkin('classic'),
+  model: 'classic',
+  name: 'Untitled skin',
+});
+
+// extension point for painting tools
+export const tools = new Registry<Tool>();
+
+// extension point for sidebar panels contributed by plugins
+export const panels = new Registry<PanelDefinition>();
+
+// extension point for named operations and their keyboard shortcuts
+export const actions = new Registry<ActionDefinition>();
+
+// extension point for studio lighting presets
+export const presets = new Registry<LightingPreset>();
+
+// plugin lifecycle manager wired to all extension points
+export const extensions = new ExtensionHost({ editor, tools, panels, actions, presets });
+
+// host environment adapter chosen once at startup
+export const platform = detectPlatform();
+
+// live 3d viewport, set by the viewport component so actions can export or reset the camera
+export const viewportRef: { current: SkinViewport | null } = { current: null };
+
+// routes pointer strokes from both views to the active tool using current ui state
+export const toolController = new ToolController(editor, {
+  activeTool: () => tools.get(useUi.getState().activeToolId),
+  color: () => useUi.getState().color,
+  brushSize: () => useUi.getState().brushSize,
+  setColor: (color) => useUi.getState().set({ color }),
+  colorUsed: (color) => useUi.getState().rememberColor(color),
+});
+
+for (const tool of builtinTools) tools.register(tool);
+for (const preset of STUDIO_PRESETS) presets.register(preset);
+extensions.install(shadingPlugin);
+
+tools.subscribe(() => {
+  if (!tools.get(useUi.getState().activeToolId)) useUi.getState().set({ activeToolId: 'pencil' });
+});
