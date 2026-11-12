@@ -312,8 +312,3 @@ export function pixelCorners(face: SkinFace, px: number, py: number): [Vec3, Vec
   const j = py - face.rect.y;
   return [at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)];
 }
-
-// short description of a face for the status bar
-export function describeFace(face: SkinFace): string {
-  return `${PART_LABELS[face.part]} · ${face.layer === 'base' ? 'Base' : 'Outer'} · ${face.face}`;
-}
