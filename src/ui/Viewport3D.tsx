@@ -96,6 +96,11 @@ export function Viewport3D() {
     canvas.addEventListener('pointerleave', onLeave);
     canvas.addEventListener('contextmenu', onContextMenu);
 
+    const sizeObserver = new ResizeObserver(() =>
+      useUi.getState().set({ viewportSize: `${container.clientWidth}x${container.clientHeight}` }),
+    );
+    sizeObserver.observe(container);
+
     const unsubscribe = useUi.subscribe((state, previous) => {
       if (state.workspace !== previous.workspace || state.studio !== previous.studio) {
         if (state.workspace !== 'browser') viewport.setLook(currentLook(), true);
@@ -109,6 +114,7 @@ export function Viewport3D() {
 
     return () => {
       unsubscribe();
+      sizeObserver.disconnect();
       viewportRef.current = null;
       viewport.dispose();
     };

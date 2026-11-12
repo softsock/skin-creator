@@ -22,6 +22,7 @@ export function StudioPanel() {
   const studio = useUi((state) => state.studio);
   const setStudio = useUi((state) => state.setStudio);
   const presetList = useRegistry(presets);
+  useUi((state) => state.viewportSize);
   const size = viewportRef.current?.exportSize(studio.exportScale);
 
   return (

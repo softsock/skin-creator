@@ -49,6 +49,7 @@ interface UiState {
   hover: HoverPixel | null;
   studio: StudioSettings;
   webglError: string | null;
+  viewportSize: string;
   notice: Notice | null;
   fileRef: FileRef | null;
   set(patch: Partial<UiState>): void;
@@ -83,6 +84,7 @@ export const useUi = create<UiState>((set) => ({
     exportScale: 2,
   },
   webglError: null,
+  viewportSize: '',
   notice: null,
   fileRef: null,
   set: (patch) => set(patch),

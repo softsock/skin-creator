@@ -222,6 +222,8 @@ test('the 2d texture view edits the same document', async ({ page }) => {
 
 test('f9 switches to studio mode and exports opaque and transparent renders', async ({ page }) => {
   await open(page);
+  await page.keyboard.press('2');
+  await expect(page.getByTestId('texture-view')).toBeVisible();
   const edit = await capture(viewport(page));
   await page.keyboard.press('F9');
   await expect(page.getByRole('radiogroup', { name: 'Lighting preset' })).toBeVisible();
@@ -232,6 +234,9 @@ test('f9 switches to studio mode and exports opaque and transparent renders', as
   expect(studio.at(0.02, 0.02)).not.toEqual(edit.at(0.02, 0.02));
 
   const box = (await viewport(page).boundingBox())!;
+  await expect(page.getByTestId('export-size')).toHaveText(
+    `${Math.round(box.width) * 2} × ${Math.round(box.height) * 2} px PNG`,
+  );
   const opaque = decode(
     await download(page, () => page.getByRole('button', { name: /Export render/ }).click()),
   );
