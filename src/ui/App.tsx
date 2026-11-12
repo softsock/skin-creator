@@ -1,5 +1,5 @@
 import { Box, Columns2, Globe, Grid2x2, RotateCcw } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
 import { actions, editor, platform, tools, viewportRef } from '../app/app';
 import { importSkin } from '../app/files';
 import { rgbaToHex } from '../core/color';
@@ -7,109 +7,107 @@ import { describeFace, getSkinFaces } from '../core/skin-layout';
 import { Tooltip } from 'radix-ui';
 import { useEditorRevision, useRegistry } from './hooks';
 import { toolIcon } from './icons';
-import { MenuBar, TabBar } from './MenuBar';
 import { ColorPanel } from './panels/ColorPanel';
 import {
   ExtensionsPanel,
+  LayersPanel,
   ModelPanel,
-  OutlinerPanel,
   PluginPanels,
-  TexturesPanel,
-  ToolOptions,
-  UvPanel,
+  ToolSettingsPanel,
 } from './panels/EditPanels';
-import { StudioOutputPanels, StudioScenePanels } from './panels/StudioPanel';
+import { StudioPanel } from './panels/StudioPanel';
 import { IconButton, Segmented } from './primitives';
 import { formatShortcut, isTyping, shortcutOf } from './shortcuts';
 import { useUi, type ViewMode } from './store';
 import { TextureView } from './TextureView';
+import { TopBar } from './TopBar';
 import { Viewport3D } from './Viewport3D';
 
 // shortcuts that must keep working while a text field is focused
 const GLOBAL_SHORTCUTS = /^(F\d+|Mod\+S|Mod\+O|Mod\+E|Mod\+Shift\+S)$/;
 
-// strip above the viewport with every registered tool, its options and the view layout switch
+// vertical tool strip listing every registered tool, including those from plugins
 function Toolbar() {
   const toolList = useRegistry(tools);
   const activeToolId = useUi((state) => state.activeToolId);
-  const editing = useUi((state) => state.workspace === 'edit');
-  const viewMode = useUi((state) => state.viewMode);
-  const webglError = useUi((state) => state.webglError);
+  const enabled = useUi((state) => state.workspace === 'edit');
   const set = useUi((state) => state.set);
   return (
-    <div
-      role="toolbar"
+    <nav
       aria-label="Tools"
-      className="flex min-h-9 shrink-0 flex-wrap items-center gap-0.5 border-b border-line bg-panel px-1.5 py-1"
+      className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-line bg-panel py-2"
     >
-      {editing ? (
-        toolList.map((tool, index) => (
-          <div key={tool.id} className="contents">
-            {index > 0 && tool.id.includes('.') && !toolList[index - 1]!.id.includes('.') && (
-              <span className="mx-1 h-5 w-px bg-line-strong" />
-            )}
-            <IconButton
-              label={tool.label}
-              shortcut={tool.shortcut}
-              icon={toolIcon(tool.icon)}
-              active={tool.id === activeToolId}
-              onClick={() => set({ activeToolId: tool.id })}
-            />
-          </div>
-        ))
-      ) : (
-        <p className="px-1.5 text-xs text-muted">
-          Studio render <span className="text-faint">· F9 returns to painting</span>
-        </p>
-      )}
-      {editing && <ToolOptions />}
-      <div className="ml-auto flex items-center gap-1.5 pl-2">
-        {editing && (
-          <Segmented<ViewMode>
-            label="View mode"
-            iconOnly
-            value={viewMode}
-            onChange={(next) => set({ viewMode: next })}
-            options={[
-              { value: '3d', label: '3D view', icon: Box, disabled: webglError !== null },
-              { value: 'split', label: 'Split view', icon: Columns2, disabled: webglError !== null },
-              { value: '2d', label: '2D texture editor', icon: Grid2x2 },
-            ]}
+      {toolList.map((tool, index) => (
+        <div key={tool.id} className="contents">
+          {index > 0 && tool.id.includes('.') && !toolList[index - 1]!.id.includes('.') && (
+            <span className="my-1 h-px w-5 bg-line" />
+          )}
+          <IconButton
+            label={tool.label}
+            shortcut={tool.shortcut}
+            icon={toolIcon(tool.icon)}
+            tipSide="right"
+            active={enabled && tool.id === activeToolId}
+            disabled={!enabled}
+            onClick={() => set({ activeToolId: tool.id })}
+            className="size-8"
           />
-        )}
-        <IconButton
-          label="Reset camera"
-          shortcut="0"
-          icon={RotateCcw}
-          disabled={webglError !== null || (editing && viewMode === '2d')}
-          onClick={() => viewportRef.current?.resetCamera()}
-        />
-      </div>
-    </div>
+        </div>
+      ))}
+    </nav>
   );
 }
 
-// central column holding the toolbar, the 3d viewport, the 2d editor or the browser placeholder
+// central area holding the 3d viewport, the 2d texture view or the browser placeholder
 function Workspace() {
   const workspace = useUi((state) => state.workspace);
   const viewMode = useUi((state) => state.viewMode);
+  const webglError = useUi((state) => state.webglError);
+  const set = useUi((state) => state.set);
   const mode: ViewMode = workspace === 'studio' ? '3d' : viewMode;
   const show3d = workspace !== 'browser' && mode !== '2d';
   const show2d = workspace === 'edit' && mode !== '3d';
 
   return (
-    <main className="relative flex min-w-0 flex-1 flex-col bg-app">
-      {workspace === 'browser' ? <BrowserPlaceholder /> : <Toolbar />}
+    <main className="relative flex min-w-0 flex-1 flex-col bg-[#16171a]">
+      {workspace === 'browser' && <BrowserPlaceholder />}
       <div className={`min-h-0 flex-1 ${workspace === 'browser' ? 'hidden' : 'flex'}`}>
         <div className={`relative min-w-0 flex-1 ${show3d ? '' : 'hidden'}`}>
           <Viewport3D />
         </div>
-        {show2d && (
-          <div className="min-w-0 flex-1 border-l border-line">
-            <TextureView />
-          </div>
-        )}
+        <div className={`min-w-0 flex-1 border-l border-line ${show2d ? '' : 'hidden'}`}>
+          <TextureView />
+        </div>
       </div>
+      {workspace === 'edit' && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-2.5">
+          <div className="pointer-events-auto">
+            <Segmented<ViewMode>
+              label="View mode"
+              className="bg-panel/90 backdrop-blur-sm"
+              value={viewMode}
+              onChange={(next) => set({ viewMode: next })}
+              options={[
+                { value: '3d', label: '3D', icon: Box, disabled: webglError !== null },
+                { value: 'split', label: 'Split', icon: Columns2, disabled: webglError !== null },
+                { value: '2d', label: '2D', icon: Grid2x2 },
+              ]}
+            />
+          </div>
+        </div>
+      )}
+      {workspace !== 'browser' && show3d && !webglError && (
+        <div className="absolute bottom-2.5 left-2.5">
+          <IconButton
+            label="Reset camera"
+            shortcut="0"
+            icon={RotateCcw}
+            tipSide="right"
+            onClick={() => viewportRef.current?.resetCamera()}
+            className="border border-line bg-panel/90 backdrop-blur-sm"
+          />
+        </div>
+      )}
       <Toast />
     </main>
   );
@@ -120,7 +118,7 @@ function BrowserPlaceholder() {
   return (
     <div className="flex flex-1 items-center justify-center p-8">
       <div className="max-w-md text-center">
-        <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border border-line-strong bg-panel text-muted">
+        <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border border-line bg-panel text-muted">
           <Globe className="size-5" strokeWidth={1.5} />
         </div>
         <h2 className="text-sm font-semibold text-fg">Integrated browser is a desktop feature</h2>
@@ -138,55 +136,25 @@ function BrowserPlaceholder() {
   );
 }
 
-// docked column of panels on one side of the viewport
-function Sidebar({ side, children }: { side: 'left' | 'right'; children: ReactNode }) {
-  return (
-    <aside
-      aria-label={`${side === 'left' ? 'Left' : 'Right'} sidebar`}
-      className={`scroll-thin w-[17.5rem] shrink-0 overflow-y-auto bg-panel ${side === 'left' ? 'border-r' : 'border-l'} border-line`}
-    >
-      {children}
-    </aside>
-  );
-}
-
-// panels shown left of the viewport: texture and project in edit mode, the scene in studio mode
-function LeftSidebar() {
-  const workspace = useUi((state) => state.workspace);
-  const docked = useUi((state) => state.viewMode === '3d');
-  if (workspace === 'browser') return null;
-  return (
-    <Sidebar side="left">
-      {workspace === 'studio' ? (
-        <StudioScenePanels />
-      ) : (
-        <>
-          {docked && <UvPanel />}
-          <TexturesPanel />
-          <ModelPanel />
-          <ExtensionsPanel />
-        </>
-      )}
-    </Sidebar>
-  );
-}
-
-// panels shown right of the viewport: color and outliner in edit mode, the output in studio mode
-function RightSidebar() {
+// right sidebar whose panels depend on the active workspace
+function Sidebar() {
   const workspace = useUi((state) => state.workspace);
   if (workspace === 'browser') return null;
   return (
-    <Sidebar side="right">
+    <aside className="scroll-thin w-[17rem] shrink-0 overflow-y-auto border-l border-line bg-panel">
       {workspace === 'studio' ? (
-        <StudioOutputPanels />
+        <StudioPanel />
       ) : (
         <>
           <ColorPanel />
-          <OutlinerPanel />
+          <ToolSettingsPanel />
+          <LayersPanel />
+          <ModelPanel />
           <PluginPanels />
+          <ExtensionsPanel />
         </>
       )}
-    </Sidebar>
+    </aside>
   );
 }
 
@@ -201,7 +169,13 @@ function StatusBar() {
   const face = hover && getSkinFaces(editor.skin.model)[hover.faceIndex];
   const hints =
     workspace === 'edit'
-      ? ['Drag on model to paint', 'Drag empty space to orbit', 'Right-drag to pan', 'F9 Studio']
+      ? [
+          'Drag on model to paint',
+          'Drag empty space to orbit',
+          'Right-drag to pan',
+          'Scroll to zoom',
+          'F9 Studio',
+        ]
       : workspace === 'studio'
         ? [
             'Drag to orbit',
@@ -212,29 +186,26 @@ function StatusBar() {
           ]
         : ['F9 Studio'];
   return (
-    <footer className="flex h-[26px] shrink-0 items-center gap-4 border-t border-line bg-back px-2.5 text-[11px] text-muted">
+    <footer className="flex h-7 shrink-0 items-center gap-4 border-t border-line bg-panel px-3 text-[11px] text-muted">
       {workspace === 'edit' && (
         <>
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span data-testid="status-tool" className="text-fg">
-              {tool?.label ?? '—'}
-            </span>
-            {tool?.hint && <span className="truncate text-faint">{tool.hint}</span>}
+          <span data-testid="status-tool" className="text-fg">
+            {tool?.label ?? '—'}
           </span>
           <span className="flex items-center gap-1.5">
             <span
-              className="size-2.5 rounded-sm border border-white/15"
+              className="size-2.5 rounded-[3px] border border-white/15"
               style={{ backgroundColor: rgbaToHex(color) }}
             />
             <span className="font-mono uppercase">{rgbaToHex(color)}</span>
           </span>
-          <span data-testid="status-pixel" className="shrink-0 tabular-nums">
+          <span data-testid="status-pixel" className="tabular-nums">
             {hover && face ? `${hover.x}, ${hover.y} · ${describeFace(face)}` : 'No pixel'}
           </span>
         </>
       )}
       {workspace === 'studio' && <span className="text-fg">Studio render</span>}
-      <span className="ml-auto flex shrink-0 items-center gap-3 text-faint">
+      <span className="ml-auto flex items-center gap-3 text-faint">
         {hints.map((hint) => (
           <span key={hint}>{hint}</span>
         ))}
@@ -295,12 +266,11 @@ export function App() {
           if (file) importSkin(file.name, new Uint8Array(await file.arrayBuffer()));
         }}
       >
-        <MenuBar />
-        <TabBar />
+        <TopBar />
         <div className="flex min-h-0 flex-1">
-          <LeftSidebar />
+          <Toolbar />
           <Workspace />
-          <RightSidebar />
+          <Sidebar />
         </div>
         <StatusBar />
       </div>

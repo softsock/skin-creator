@@ -2,25 +2,18 @@
 
 @theme {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --color-app: #181a1f;
-  --color-back: #21252b;
-  --color-panel: #282c34;
-  --color-raised: #21252b;
-  --color-hover: #3a3f4b;
-  --color-selected: #474d5d;
-  --color-line: #181a1f;
-  --color-line-strong: #3f4553;
-  --color-fg: #f4f3ff;
-  --color-muted: #cacad4;
-  --color-faint: #848891;
-  --color-accent: #3e90ff;
-  --color-accent-fg: #000006;
+  --color-app: #0e0f11;
+  --color-panel: #16171a;
+  --color-raised: #1d1f23;
+  --color-hover: #26282d;
+  --color-line: #25272c;
+  --color-line-strong: #353840;
+  --color-fg: #e7e8eb;
+  --color-muted: #9b9ea7;
+  --color-faint: #686b74;
+  --color-accent: #3ecf8e;
+  --color-accent-fg: #052e1c;
   --color-danger: #f0616d;
-  --radius-xs: 1px;
-  --radius-sm: 1px;
-  --radius-md: 2px;
-  --radius-lg: 3px;
-  --radius-xl: 4px;
 }
 
 html,
@@ -44,20 +37,20 @@ input {
   user-select: text;
 }
 
-/* checkerboard shown behind transparent content in the studio and the texture thumbnails */
+/* checkerboard shown behind transparent content in the studio and the color swatches */
 .checker {
-  background-color: #1c2026;
+  background-color: #1b1c20;
   background-image:
-    linear-gradient(45deg, #262b33 25%, transparent 25%, transparent 75%, #262b33 75%),
-    linear-gradient(45deg, #262b33 25%, transparent 25%, transparent 75%, #262b33 75%);
+    linear-gradient(45deg, #2a2c31 25%, transparent 25%, transparent 75%, #2a2c31 75%),
+    linear-gradient(45deg, #2a2c31 25%, transparent 25%, transparent 75%, #2a2c31 75%);
   background-position:
     0 0,
     8px 8px;
   background-size: 16px 16px;
 }
 
-/* thin unobtrusive scrollbars for the sidebars */
+/* thin unobtrusive scrollbars for the sidebar */
 .scroll-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-selected) transparent;
+  scrollbar-color: var(--color-line-strong) transparent;
 }

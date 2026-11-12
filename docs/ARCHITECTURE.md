@@ -83,13 +83,6 @@ viewport tweens to it, which gives the F9 transition and guarantees the same mod
 canvases (`Viewport3D`, `TextureView`) are imperative: they subscribe to the store and the document
 directly and do not re-render React on pointer movement.
 
-The shell follows the Blockbench layout: `MenuBar` (File, Edit, Tools, View and the mode selector), `TabBar`
-(document tab, undo, redo, save), a docked sidebar on each side of the viewport, a toolbar above the
-viewport with the tools and their options, and a status bar. Sidebar panels are `Section`s that fold. In
-3D view the texture editor is docked as the UV panel; in split and 2D view the same component moves into
-the main area, so only one `TextureView` exists at a time. Studio mode reuses both sidebars for its own
-panels. Theme colours and corner radii are tokens in `src/index.css`.
-
 ## Platform (`src/platform`, `electron/`)
 
 `PlatformAdapter` has two methods, `openPng` and `savePng`. The web adapter uses a file input and a

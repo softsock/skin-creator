@@ -63,7 +63,7 @@ function Swatch({ color, active, onPick }: { color: Rgba; active: boolean; onPic
       title={hex}
       onClick={() => onPick(color)}
       style={{ backgroundColor: hex }}
-      className={`aspect-square rounded-sm ring-offset-2 ring-offset-panel transition-shadow hover:ring-1 hover:ring-fg/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent ${active ? 'ring-1 ring-fg' : ''}`}
+      className={`aspect-square rounded-[4px] ring-offset-2 ring-offset-panel transition-shadow hover:ring-1 hover:ring-fg/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent ${active ? 'ring-1 ring-fg' : ''}`}
     />
   );
 }
@@ -113,7 +113,7 @@ export function ColorPanel() {
       </div>
       <div className="flex items-center gap-2">
         <span
-          className="size-7 shrink-0 rounded-md border border-line"
+          className="size-7 shrink-0 rounded-md border border-line-strong"
           style={{ backgroundColor: rgbaToHex(color) }}
         />
         <input
@@ -127,7 +127,7 @@ export function ColorPanel() {
           }}
           onBlur={() => setDraft(null)}
           onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()}
-          className="h-7 min-w-0 flex-1 rounded-md border border-line bg-back px-2 font-mono text-xs text-fg uppercase outline-none focus:border-accent"
+          className="h-7 min-w-0 flex-1 rounded-md border border-line bg-app px-2 font-mono text-xs text-fg uppercase outline-none focus:border-accent"
         />
       </div>
       <div className="mt-1 grid grid-cols-8 gap-1.5">
