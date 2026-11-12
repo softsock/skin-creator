@@ -5,11 +5,24 @@ import type { PaintTargetMode } from '../editor/paint-target';
 import type { FileRef } from '../platform/platform';
 import { allVisible, type Visibility } from '../renderer/skin-object';
 
-// top level modes of the application shown as tabs in the top bar
-export type Workspace = 'edit' | 'studio' | 'browser';
+// content a view area can show, chosen independently for each of the two areas
+export type ViewKind = '3d' | '2d' | 'parts' | 'render' | 'browser' | 'namemc';
 
-// how the edit workspace splits between the 3d model and the flat texture
-export type ViewMode = '3d' | 'split' | '2d';
+// the two dockable view areas of the workspace
+export type SlotId = 'a' | 'b';
+
+// every view kind in the order the view switcher lists them
+export const VIEW_KINDS: readonly ViewKind[] = ['3d', '2d', 'parts', 'render', 'browser', 'namemc'];
+
+// captions for view kinds, shared by the switcher and the dock tabs
+export const VIEW_LABELS: Record<ViewKind, string> = {
+  '3d': '3D',
+  '2d': '2D',
+  parts: '2D Parts',
+  render: '3D Render',
+  browser: 'Browser',
+  namemc: 'NameMC',
+};
 
 // pixel currently under the pointer, shared so both views and the status bar stay in sync
 export interface HoverPixel {
@@ -38,8 +51,9 @@ export interface Notice {
 
 // interface state only, the skin itself lives in the editor core
 interface UiState {
-  workspace: Workspace;
-  viewMode: ViewMode;
+  views: Record<SlotId, ViewKind>;
+  activeSlot: SlotId;
+  openPanels: readonly string[];
   activeToolId: string;
   color: Rgba;
   recentColors: readonly Rgba[];
@@ -53,6 +67,7 @@ interface UiState {
   notice: Notice | null;
   fileRef: FileRef | null;
   set(patch: Partial<UiState>): void;
+  setView(slot: SlotId, kind: ViewKind): void;
   setStudio(patch: Partial<StudioSettings>): void;
   toggleVisibility(part: PartId, layer: LayerId): void;
   setLayerVisibility(layer: LayerId, visible: boolean): void;
@@ -60,13 +75,29 @@ interface UiState {
   notify(kind: Notice['kind'], text: string): void;
 }
 
+// storage key for the view kinds the user last had open
+const VIEWS_KEY = 'skin-studio.views.v1';
+
 // counter for notice ids so repeated identical messages still re-trigger the toast
 let noticeId = 0;
 
+// restores the last view kinds, falling back to the 3d plus parts pairing of a fresh session
+function loadViews(): Record<SlotId, ViewKind> {
+  const fallback: Record<SlotId, ViewKind> = { a: '3d', b: 'parts' };
+  try {
+    const saved = JSON.parse(localStorage.getItem(VIEWS_KEY) ?? 'null') as Partial<Record<SlotId, string>>;
+    const pick = (slot: SlotId) => VIEW_KINDS.find((kind) => kind === saved?.[slot]) ?? fallback[slot];
+    return { a: pick('a'), b: pick('b') };
+  } catch {
+    return fallback;
+  }
+}
+
 // single zustand store for ui state, read by components and by the tool environment
 export const useUi = create<UiState>((set) => ({
-  workspace: 'edit',
-  viewMode: '3d',
+  views: loadViews(),
+  activeSlot: 'a',
+  openPanels: [],
   activeToolId: 'pencil',
   color: [233, 84, 84, 255],
   recentColors: [],
@@ -88,6 +119,7 @@ export const useUi = create<UiState>((set) => ({
   notice: null,
   fileRef: null,
   set: (patch) => set(patch),
+  setView: (slot, kind) => set((state) => ({ views: { ...state.views, [slot]: kind }, hover: null })),
   setStudio: (patch) => set((state) => ({ studio: { ...state.studio, ...patch } })),
   toggleVisibility: (part, layer) =>
     set((state) => ({
@@ -109,3 +141,7 @@ export const useUi = create<UiState>((set) => ({
     })),
   notify: (kind, text) => set({ notice: { id: ++noticeId, kind, text } }),
 }));
+
+useUi.subscribe((state, previous) => {
+  if (state.views !== previous.views) localStorage.setItem(VIEWS_KEY, JSON.stringify(state.views));
+});

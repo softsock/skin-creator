@@ -340,6 +340,10 @@ export class SkinViewport {
 
   // renders the current view offscreen-sized and returns it as a png
   async exportPng(scale: number): Promise<Blob> {
+    if (this.transition) {
+      this.applyValues(this.transition.to);
+      this.transition = null;
+    }
     const { width, height } = this.exportSize(scale);
     const hoverVisible = this.hover.map((line) => line.visible);
     for (const line of this.hover) line.visible = false;

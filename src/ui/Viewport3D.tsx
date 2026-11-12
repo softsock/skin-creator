@@ -1,19 +1,19 @@
 import { useEffect, useRef } from 'react';
-import { editor, presets, toolController, viewportRef } from '../app/app';
+import { editor, presets, toolController, viewports } from '../app/app';
 import { resolvePaintTarget, type PaintTargetMode } from '../editor/paint-target';
 import type { PixelTarget } from '../editor/tool';
 import { getSkinFaces, type LayerId } from '../core/skin-layout';
 import { EDITOR_LIGHTING } from '../renderer/lighting';
 import { SkinViewport, type ViewportLook } from '../renderer/viewport';
-import { useUi } from './store';
+import { useUi, type SlotId } from './store';
 
 // field of view used while editing, wider than studio for comfortable close-up painting
 const EDIT_FOV = 35;
 
-// derives the viewport look from ui state, the only difference between edit and studio mode
-function currentLook(): ViewportLook {
-  const { workspace, studio } = useUi.getState();
-  if (workspace !== 'studio') return { lighting: EDITOR_LIGHTING, fov: EDIT_FOV, transparent: false };
+// derives the look of one view area from ui state, the only difference between 3d and render views
+function lookOf(slot: SlotId): ViewportLook {
+  const { views, studio } = useUi.getState();
+  if (views[slot] !== 'render') return { lighting: EDITOR_LIGHTING, fov: EDIT_FOV, transparent: false };
   const preset = presets.get(studio.presetId) ?? presets.list()[0] ?? EDITOR_LIGHTING;
   return {
     lighting: {
@@ -27,26 +27,30 @@ function currentLook(): ViewportLook {
   };
 }
 
-// hosts the three.js viewport and translates pointer input into tool strokes
-export function Viewport3D() {
+// hosts one three.js viewport for a view area and translates pointer input into tool strokes
+export function Viewport3D({ slot }: { slot: SlotId }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const workspace = useUi((state) => state.workspace);
-  const transparent = useUi((state) => state.workspace === 'studio' && state.studio.transparent);
+  const render = useUi((state) => state.views[slot] === 'render');
+  const transparent = useUi((state) => state.views[slot] === 'render' && state.studio.transparent);
   const webglError = useUi((state) => state.webglError);
 
   useEffect(() => {
     const container = containerRef.current!;
+    const painting = () => useUi.getState().views[slot] === '3d';
     let viewport: SkinViewport;
     try {
-      viewport = new SkinViewport(container, editor, currentLook());
+      viewport = new SkinViewport(container, editor, lookOf(slot));
     } catch (error) {
       console.error(error);
-      useUi
-        .getState()
-        .set({ webglError: error instanceof Error ? error.message : String(error), viewMode: '2d' });
+      const { views, set } = useUi.getState();
+      const flat = (kind: (typeof views)[SlotId]) => (kind === '3d' || kind === 'render' ? '2d' : kind);
+      set({
+        webglError: error instanceof Error ? error.message : String(error),
+        views: { a: flat(views.a), b: flat(views.b) },
+      });
       return;
     }
-    viewportRef.current = viewport;
+    viewports.set(slot, viewport);
     viewport.setVisibility(useUi.getState().visibility);
     const canvas = viewport.canvas;
     let strokeLayer: LayerId | null = null;
@@ -62,23 +66,21 @@ export function Viewport3D() {
       }
     };
     const onDown = (event: PointerEvent) => {
-      const ui = useUi.getState();
-      if (event.button !== 0 || ui.workspace !== 'edit') return;
-      const target = targetAt(event, ui.paintTarget);
+      if (event.button !== 0 || !painting()) return;
+      const target = targetAt(event, useUi.getState().paintTarget);
       if (!target || !toolController.begin(target)) return;
       strokeLayer = target.face.layer;
       viewport.controls.enabled = false;
       canvas.setPointerCapture(event.pointerId);
     };
     const onMove = (event: PointerEvent) => {
-      const ui = useUi.getState();
-      if (ui.workspace !== 'edit') return;
+      if (!painting()) return;
       if (strokeLayer) {
         const target = targetAt(event, strokeLayer);
         if (target) toolController.move(target);
         setHover(target);
       } else if (event.buttons === 0) {
-        setHover(targetAt(event, ui.paintTarget));
+        setHover(targetAt(event, useUi.getState().paintTarget));
       }
     };
     const onUp = () => {
@@ -97,36 +99,38 @@ export function Viewport3D() {
     canvas.addEventListener('contextmenu', onContextMenu);
 
     const sizeObserver = new ResizeObserver(() =>
-      useUi.getState().set({ viewportSize: `${container.clientWidth}x${container.clientHeight}` }),
+      useUi.getState().set({ viewportSize: `${slot}:${container.clientWidth}x${container.clientHeight}` }),
     );
     sizeObserver.observe(container);
 
     const unsubscribe = useUi.subscribe((state, previous) => {
-      if (state.workspace !== previous.workspace || state.studio !== previous.studio) {
-        if (state.workspace !== 'browser') viewport.setLook(currentLook(), true);
+      const kindChanged = state.views[slot] !== previous.views[slot];
+      if (kindChanged || (state.studio !== previous.studio && state.views[slot] === 'render')) {
+        viewport.setLook(lookOf(slot), true);
       }
       if (state.visibility !== previous.visibility) viewport.setVisibility(state.visibility);
-      if (state.hover !== previous.hover) {
-        const face = state.hover && getSkinFaces(editor.skin.model)[state.hover.faceIndex];
-        viewport.setHover(state.hover && face ? { face, x: state.hover.x, y: state.hover.y } : null);
+      if (state.hover !== previous.hover || kindChanged) {
+        const hover = state.views[slot] === '3d' ? state.hover : null;
+        const face = hover && getSkinFaces(editor.skin.model)[hover.faceIndex];
+        viewport.setHover(hover && face ? { face, x: hover.x, y: hover.y } : null);
       }
     });
 
     return () => {
       unsubscribe();
       sizeObserver.disconnect();
-      viewportRef.current = null;
+      viewports.delete(slot);
       viewport.dispose();
     };
-  }, []);
+  }, [slot]);
 
   if (webglError) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center">
         <p className="text-sm font-medium text-fg">3D viewport unavailable</p>
         <p className="max-w-sm text-xs leading-relaxed text-muted">
-          This browser could not create a WebGL2 context, so the 3D view and Studio mode are disabled. The 2D
-          texture editor keeps working.
+          This browser could not create a WebGL2 context, so the 3D and 3D Render views are disabled. The 2D
+          views keep working.
         </p>
         <p className="max-w-sm text-[11px] text-faint">{webglError}</p>
       </div>
@@ -136,7 +140,7 @@ export function Viewport3D() {
     <div
       ref={containerRef}
       data-testid="viewport-3d"
-      className={`h-full w-full ${transparent ? 'checker' : ''} ${workspace === 'edit' ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'}`}
+      className={`h-full w-full ${transparent ? 'checker' : ''} ${render ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
     />
   );
 }

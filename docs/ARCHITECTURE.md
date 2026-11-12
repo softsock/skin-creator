@@ -83,19 +83,35 @@ viewport tweens to it, which gives the F9 transition and guarantees the same mod
 canvases (`Viewport3D`, `TextureView`) are imperative: they subscribe to the store and the document
 directly and do not re-render React on pointer movement.
 
+The workspace is a dock (`ui/Dock.tsx`, built on dockview). `ui/layout.ts` lists the panels, builds the
+default arrangement, saves the layout to `localStorage` and reopens closed panels. Two of the panels are
+view areas (`ui/ViewSlot.tsx`); the store keeps a `ViewKind` per area (`3d`, `2d`, `parts`, `render`,
+`browser`, `namemc`) and which area is active, and the view switcher in the top bar changes the active one.
+Each 3D area owns its own `SkinViewport`, registered in `app.viewports`; `viewportFor(kinds)` finds the
+one an action should use. A render area is the same viewport with the studio look, so switching a 3D area
+to 3D Render animates instead of remounting. `TextureView` draws either the atlas or the parts sheet from
+`core/skin-layout.ts` (`getPartSheet`), mapping every tile back to real texture pixels.
+
 ## Platform (`src/platform`, `electron/`)
 
-`PlatformAdapter` has two methods, `openPng` and `savePng`. The web adapter uses a file input and a
-download. The desktop adapter calls `window.skinStudioDesktop`, exposed by `electron/preload.cts`.
+`PlatformAdapter` has `openPng`, `savePng` and `onBrowserDownload`. The web adapter uses a file input and
+a download. The desktop adapter calls `window.skinStudioDesktop`, exposed by `electron/preload.cts`.
 
 `electron/main.cts` creates a window with `contextIsolation`, `sandbox` and no Node integration, denies
 permissions, navigation and new windows, validates IPC senders, only writes PNG data, and only to paths the
 user picked in a native dialog (the renderer holds an opaque token, never a path).
+
+The Browser and NameMC views are a `<webview>` (`ui/BrowserView.tsx`) in the `skin-browser` session
+partition. The main process strips any preload, forces sandboxing, refuses other partitions and non-https
+sources, denies permissions, keeps popups in the same view, and intercepts downloads: only a PNG under
+4 MB is read, sent to the renderer and deleted from the temp folder, and it becomes a skin only when the
+user presses Import.
 
 ## Testing
 
 - Vitest (`src/**/*.test.ts`, Node environment): layout table, picking, commands and history, PNG codec,
   tools, paint targeting, registries and the extension host.
 - Playwright (`e2e/`, production build, software WebGL): painting on the model, drag strokes versus
-  orbiting, tools, import/export round-trips, 2D editing, Studio mode and both render exports, extension
-  disable, browser placeholder. Tests assert on downloaded PNG pixels.
+  orbiting, tools, import/export round-trips, 2D atlas and parts editing, the render view and both render
+  exports, extension disable, the web browser fallback, and the dock (float, close, reopen, drag, swap,
+  persistence, reset). Tests assert on downloaded PNG pixels.

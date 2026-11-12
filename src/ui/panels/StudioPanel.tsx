@@ -1,5 +1,5 @@
 import { Download, RotateCcw } from 'lucide-react';
-import { presets, viewportRef } from '../../app/app';
+import { presets, viewportFor } from '../../app/app';
 import { exportRender } from '../../app/files';
 import { useRegistry } from '../hooks';
 import { Button, Section, Segmented, SliderRow, SwitchRow } from '../primitives';
@@ -23,7 +23,8 @@ export function StudioPanel() {
   const setStudio = useUi((state) => state.setStudio);
   const presetList = useRegistry(presets);
   useUi((state) => state.viewportSize);
-  const size = viewportRef.current?.exportSize(studio.exportScale);
+  useUi((state) => state.views);
+  const size = (viewportFor(['render']) ?? viewportFor(['3d']))?.exportSize(studio.exportScale);
 
   return (
     <>
@@ -92,7 +93,7 @@ export function StudioPanel() {
       <Section
         title="Camera"
         action={
-          <Button onClick={() => viewportRef.current?.resetCamera()} className="-mr-1.5 h-6 px-1.5">
+          <Button onClick={() => viewportFor(['render', '3d'])?.resetCamera()} className="-mr-1.5 h-6 px-1.5">
             <RotateCcw className="size-3" /> Reset
           </Button>
         }

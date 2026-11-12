@@ -10,7 +10,7 @@ import { Registry } from '../extensions/registry';
 import { detectPlatform } from '../platform/platform';
 import { STUDIO_PRESETS, type LightingPreset } from '../renderer/lighting';
 import type { SkinViewport } from '../renderer/viewport';
-import { useUi } from '../ui/store';
+import { useUi, type SlotId, type ViewKind } from '../ui/store';
 
 // the one editor instance of the running application
 export const editor = new Editor({
@@ -37,8 +37,19 @@ export const extensions = new ExtensionHost({ editor, tools, panels, actions, pr
 // host environment adapter chosen once at startup
 export const platform = detectPlatform();
 
-// live 3d viewport, set by the viewport component so actions can export or reset the camera
-export const viewportRef: { current: SkinViewport | null } = { current: null };
+// live 3d viewports by view area, registered by their components so actions can reach them
+export const viewports = new Map<SlotId, SkinViewport>();
+
+// finds the viewport of a view area showing one of the given kinds, the active area first
+export function viewportFor(kinds: readonly ViewKind[]): SkinViewport | null {
+  const { views, activeSlot } = useUi.getState();
+  const order: SlotId[] = activeSlot === 'a' ? ['a', 'b'] : ['b', 'a'];
+  for (const slot of order) {
+    const viewport = viewports.get(slot);
+    if (viewport && kinds.includes(views[slot])) return viewport;
+  }
+  return null;
+}
 
 // routes pointer strokes from both views to the active tool using current ui state
 export const toolController = new ToolController(editor, {

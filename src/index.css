@@ -1,18 +1,19 @@
 @import 'tailwindcss';
+@import 'dockview-react/dist/styles/dockview.css';
 
 @theme {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --color-app: #0e0f11;
-  --color-panel: #16171a;
-  --color-raised: #1d1f23;
-  --color-hover: #26282d;
-  --color-line: #25272c;
-  --color-line-strong: #353840;
-  --color-fg: #e7e8eb;
-  --color-muted: #9b9ea7;
-  --color-faint: #686b74;
-  --color-accent: #3ecf8e;
-  --color-accent-fg: #052e1c;
+  --color-app: #0d0f17;
+  --color-panel: #151824;
+  --color-raised: #1c2030;
+  --color-hover: #272c40;
+  --color-line: #232839;
+  --color-line-strong: #363c55;
+  --color-fg: #e6e8f2;
+  --color-muted: #9aa0b8;
+  --color-faint: #666c85;
+  --color-accent: #aeb8f6;
+  --color-accent-fg: #10142b;
   --color-danger: #f0616d;
 }
 
@@ -39,18 +40,56 @@ input {
 
 /* checkerboard shown behind transparent content in the studio and the color swatches */
 .checker {
-  background-color: #1b1c20;
+  background-color: #1a1e2c;
   background-image:
-    linear-gradient(45deg, #2a2c31 25%, transparent 25%, transparent 75%, #2a2c31 75%),
-    linear-gradient(45deg, #2a2c31 25%, transparent 25%, transparent 75%, #2a2c31 75%);
+    linear-gradient(45deg, #262b3d 25%, transparent 25%, transparent 75%, #262b3d 75%),
+    linear-gradient(45deg, #262b3d 25%, transparent 25%, transparent 75%, #262b3d 75%);
   background-position:
     0 0,
     8px 8px;
   background-size: 16px 16px;
 }
 
-/* thin unobtrusive scrollbars for the sidebar */
+/* thin unobtrusive scrollbars for the panels */
 .scroll-thin {
   scrollbar-width: thin;
   scrollbar-color: var(--color-line-strong) transparent;
+}
+
+/* recolors the dock so its spaced cards, tabs and drop targets use the application palette */
+.dockview-theme-abyss-spaced {
+  --dv-group-view-background-color: var(--color-panel);
+  --dv-tabs-and-actions-container-background-color: var(--color-panel);
+  --dv-tabs-and-actions-container-height: 38px;
+  --dv-tabs-and-actions-container-font-size: 12px;
+  --dv-activegroup-visiblepanel-tab-background-color: var(--color-hover);
+  --dv-activegroup-visiblepanel-tab-color: var(--color-fg);
+  --dv-activegroup-hiddenpanel-tab-background-color: transparent;
+  --dv-activegroup-hiddenpanel-tab-color: var(--color-muted);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--color-raised);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--color-fg);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: transparent;
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--color-faint);
+  --dv-tab-margin-block: 6px;
+  --dv-tab-margin-inline: 3px;
+  --dv-spacing-padding: 8px;
+  --dv-border-radius: 12px;
+  --dv-icon-hover-background-color: var(--color-hover);
+  --dv-drag-over-background-color: rgb(174 184 246 / 0.16);
+  --dv-drag-over-border: 1px solid rgb(174 184 246 / 0.6);
+  --dv-edge-dock-indicator-color: rgb(174 184 246 / 0.9);
+  --dv-active-sash-color: rgb(174 184 246 / 0.5);
+  --dv-floating-box-shadow: 0 16px 48px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.3);
+  --dv-floating-group-border: 1px solid var(--color-line-strong);
+  --dv-context-menu-background-color: var(--color-raised);
+  --dv-context-menu-color: var(--color-fg);
+  background-color: var(--color-app);
+  padding-top: 0;
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}
+
+/* outlines every docked card so panels read as separate surfaces on the dark backdrop */
+.dockview-theme-abyss-spaced .dv-groupview {
+  border: 1px solid var(--color-line);
 }

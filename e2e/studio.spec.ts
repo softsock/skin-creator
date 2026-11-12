@@ -191,7 +191,7 @@ test('import and export round-trip pixels exactly for classic and slim skins', a
 
   const legacy = encode({ width: 64, height: 32, data: new Uint8Array(64 * 32 * 4), channels: 4, depth: 8 });
   await importSkin(page, 'legacy.png', legacy);
-  await expect(page.getByRole('status')).toContainText('Legacy 64×32');
+  await expect(page.getByTestId('toast')).toContainText('Legacy 64×32');
   expect(await exportSkin(page)).toEqual(slim);
 
   await page.getByRole('radio', { name: 'Classic' }).click();
@@ -201,33 +201,46 @@ test('import and export round-trip pixels exactly for classic and slim skins', a
   await expect(page.getByRole('radio', { name: 'Slim' })).toBeChecked();
 });
 
-test('the 2d texture view edits the same document', async ({ page }) => {
+test('the 2d parts and atlas views edit the same document', async ({ page }) => {
   await open(page);
   const baseline = await exportSkin(page);
-  await page.keyboard.press('3');
-  const texture = page.getByTestId('texture-view');
-  await expect(texture).toBeVisible();
-  const spot = await pointIn(texture, 0.5, 0.36);
-  await page.mouse.move(spot.x, spot.y);
-  await expect(page.getByTestId('status-pixel')).toContainText('·');
-  const status = (await page.getByTestId('status-pixel').textContent())!;
-  const [x, y] = status.split(' · ')[0]!.split(', ').map(Number) as [number, number];
-  await page.mouse.click(spot.x, spot.y);
-  expect(diff(baseline, await exportSkin(page))).toEqual([y * SKIN_SIZE + x]);
+  const pixelAt = async (texture: Locator, fx: number, fy: number) => {
+    const spot = await pointIn(texture, fx, fy);
+    await page.mouse.move(spot.x, spot.y);
+    await expect(page.getByTestId('status-pixel')).toContainText('·');
+    const status = (await page.getByTestId('status-pixel').textContent())!;
+    const [x, y] = status.split(' · ')[0]!.split(', ').map(Number) as [number, number];
+    await page.mouse.click(spot.x, spot.y);
+    return { index: y * SKIN_SIZE + x, status };
+  };
 
+  const parts = page.getByTestId('view-b').getByTestId('texture-view');
+  await expect(parts).toBeVisible();
+  const first = await pixelAt(parts, 0.3, 0.3);
+  expect(first.status).toContain('Head · Base');
+  expect(diff(baseline, await exportSkin(page))).toEqual([first.index]);
+
+  await page.getByTestId('view-a').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('Control+z');
   await page.keyboard.press('2');
+  await expect(viewport(page)).toHaveCount(0);
+  const atlas = page.getByTestId('view-a').getByTestId('texture-view');
+  const second = await pixelAt(atlas, 0.5, 0.36);
+  expect(diff(baseline, await exportSkin(page))).toEqual([second.index]);
+
+  await page.keyboard.press('1');
   await expect(viewport(page)).toBeVisible();
-  await expect(texture).toBeVisible();
+  await expect(parts).toBeVisible();
 });
 
-test('f9 switches to studio mode and exports opaque and transparent renders', async ({ page }) => {
+test('f9 switches to the studio render and exports opaque and transparent renders', async ({ page }) => {
   await open(page);
-  await page.keyboard.press('2');
   await expect(page.getByTestId('texture-view')).toBeVisible();
   const edit = await capture(viewport(page));
   await page.keyboard.press('F9');
   await expect(page.getByRole('radiogroup', { name: 'Lighting preset' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Pencil' })).toBeDisabled();
+  await expect(page.getByRole('radio', { name: 'Render', exact: true })).toBeChecked();
+  await expect(page.getByRole('radio', { name: '3D Render' })).toBeChecked();
   await page.waitForTimeout(900);
   const studio = await capture(viewport(page));
   expect(studio.at(0.5, 0.5)).not.toEqual(edit.at(0.5, 0.5));
@@ -265,7 +278,7 @@ test('f9 switches to studio mode and exports opaque and transparent renders', as
   expect(dramatic.at(0.5, 0.5)).not.toEqual(studio.at(0.5, 0.5));
 
   await page.keyboard.press('F9');
-  await expect(page.getByRole('button', { name: 'Pencil' })).toBeEnabled();
+  await expect(page.getByRole('radio', { name: 'Editor' })).toBeChecked();
   await page.waitForTimeout(900);
   const back = await capture(viewport(page));
   expect(back.at(0.5, 0.5)).toEqual(edit.at(0.5, 0.5));
@@ -293,11 +306,70 @@ test('the example extension contributes tools and a panel and can be disabled', 
   await expect(page.getByTestId('status-tool')).toHaveText('Pencil');
 });
 
-test('the browser workspace explains that it is desktop-only', async ({ page }) => {
+test('the browser view explains that it is desktop-only on the web', async ({ page }) => {
   await open(page);
-  await page.getByRole('radio', { name: 'Browser' }).click();
+  await page.getByRole('radio', { name: 'NameMC' }).click();
   await expect(page.getByText('Integrated browser is a desktop feature')).toBeVisible();
-  await expect(viewport(page)).toBeHidden();
-  await page.getByRole('radio', { name: 'Edit' }).click();
+  await expect(page.getByRole('link', { name: 'Open NameMC in a new tab' })).toHaveAttribute(
+    'href',
+    'https://namemc.com/minecraft-skins',
+  );
+  await expect(viewport(page)).toHaveCount(0);
+  await page.getByRole('radio', { name: '3D', exact: true }).click();
   await expect(viewport(page)).toBeVisible();
+});
+
+test('rendering from an editing view switches it to the studio look first', async ({ page }) => {
+  await open(page);
+  const box = (await viewport(page).boundingBox())!;
+  const render = decode(await download(page, () => page.getByRole('button', { name: 'Render' }).click()));
+  expect([render.width, render.height]).toEqual([Math.round(box.width) * 2, Math.round(box.height) * 2]);
+  await expect(page.getByRole('radio', { name: '3D Render' })).toBeChecked();
+  await page.waitForTimeout(900);
+  const live = await capture(viewport(page));
+  const offset =
+    (Math.floor(render.height * 0.03) * render.width + Math.floor(render.width * 0.03)) * render.channels;
+  const corner = [...render.data.slice(offset, offset + 3)];
+  const liveCorner = live.at(0.03, 0.03);
+  for (const channel of [0, 1, 2]) expect(Math.abs(corner[channel]! - liveCorner[channel]!)).toBeLessThan(6);
+});
+
+test('panels float, close, reopen and move, and the layout persists until it is reset', async ({ page }) => {
+  await open(page);
+  const hex = page.getByLabel('Hex color');
+  const group = (content: Locator) => page.locator('.dv-groupview', { has: content });
+  const viewMenuItem = async (name: string) => {
+    await page.getByRole('button', { name: 'View', exact: true }).click();
+    await page.getByRole(name === 'Reset layout' ? 'menuitem' : 'menuitemcheckbox', { name }).click();
+  };
+
+  await group(hex).getByRole('button', { name: 'Float this panel' }).click();
+  await expect(page.locator('.dv-resize-container', { has: hex })).toBeVisible();
+
+  await viewMenuItem('Color');
+  await expect(hex).toHaveCount(0);
+  await viewMenuItem('Color');
+  await expect(page.locator('.dv-resize-container', { has: hex })).toBeVisible();
+
+  const swatch = page.getByRole('button', { name: 'Use color #1a1c2c' });
+  await page
+    .getByText('Palette', { exact: true })
+    .dragTo(group(page.getByRole('button', { name: 'Pencil' })).locator('.dv-content-container'));
+  await expect(group(swatch).getByText('Tools', { exact: true })).toHaveCount(1);
+
+  await page.getByRole('button', { name: 'Swap the two views' }).click();
+  await expect(page.getByTestId('view-a').getByTestId('texture-view')).toBeVisible();
+  await expect(page.getByTestId('view-b').getByTestId('viewport-3d')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Show one view' }).click();
+  await expect(page.getByTestId('view-b')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId('view-a').getByTestId('texture-view')).toBeVisible();
+  await expect(page.getByTestId('view-b')).toHaveCount(0);
+  await expect(page.locator('.dv-resize-container', { has: hex })).toBeVisible();
+
+  await viewMenuItem('Reset layout');
+  await expect(page.getByTestId('view-b')).toBeVisible();
+  await expect(page.locator('.dv-resize-container')).toHaveCount(0);
+  await expect(group(swatch).getByText('Tools', { exact: true })).toHaveCount(0);
 });

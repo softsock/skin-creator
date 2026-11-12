@@ -11,11 +11,18 @@ export interface OpenedFile {
   readonly ref?: FileRef;
 }
 
+// outcome of a download started in the integrated browser, bytes are absent when it was refused
+export interface BrowserDownload {
+  readonly name: string;
+  readonly bytes: Uint8Array | null;
+}
+
 // boundary between the editor and the host environment, keeping electron out of core code
 export interface PlatformAdapter {
   readonly kind: 'web' | 'desktop';
   openPng(): Promise<OpenedFile | null>;
   savePng(bytes: Uint8Array, suggestedName: string, ref?: FileRef): Promise<FileRef | null>;
+  onBrowserDownload(listener: (download: BrowserDownload) => void): () => void;
 }
 
 // bridge object the electron preload script exposes on window
@@ -26,6 +33,7 @@ export interface DesktopBridge {
     suggestedName: string,
     token?: string,
   ): Promise<{ name: string; token: string } | null>;
+  onBrowserDownload(listener: (download: BrowserDownload) => void): () => void;
 }
 
 declare global {
@@ -54,6 +62,7 @@ const webPlatform: PlatformAdapter = {
     downloadBlob(new Blob([bytes.slice()], { type: 'image/png' }), suggestedName);
     return { name: suggestedName };
   },
+  onBrowserDownload: () => () => undefined,
 };
 
 // desktop implementation delegating to native dialogs through the preload bridge
@@ -67,6 +76,7 @@ function desktopPlatform(bridge: DesktopBridge): PlatformAdapter {
     async savePng(bytes, suggestedName, ref) {
       return bridge.savePng(bytes, suggestedName, ref?.token);
     },
+    onBrowserDownload: (listener) => bridge.onBrowserDownload(listener),
   };
 }
 

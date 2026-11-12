@@ -20,10 +20,11 @@ Ordered by priority within each group. Items here are not implemented.
 - **Plugin runtime for untrusted code** – load plugins in a sandboxed iframe or worker and serve
   `PluginApi` over messages; add an install flow that shows requested permissions. Extend the API with
   import/export format contributions.
-- **Integrated browser (desktop)** – a `WebContentsView` in its own session partition with navigation
-  controls and tabs, no Node access, all permissions denied, window opening and navigation validated, and
-  downloads handled through `will-download` so a PNG can be imported only after the user confirms. No
-  scraping of NameMC; respect the service's terms.
+- **Integrated browser (desktop)** – the first version exists (one isolated webview per view area with
+  navigation and PNG import). Still open: tabs, a persistent profile, and checking how NameMC treats an
+  embedded browser. No scraping of NameMC; respect the service's terms.
+- **Reference design leftovers** – paint layers, shape and selection tools, reference images and a PNG
+  view, quick views and presets.
 - **AI assistance** – palette generation, automatic shading, reference image to skin, and an MCP server.
   All of it must act through editor commands, exactly like tools and plugins.
 - **Rendering** – animation playback, cut-out aware ambient occlusion, optional offline rendering through

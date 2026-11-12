@@ -6,19 +6,52 @@ import { LAYER_IDS, PART_IDS, PART_LABELS, type LayerId, type SkinModel } from '
 import type { PaintTargetMode } from '../../editor/paint-target';
 import type { PanelDefinition } from '../../extensions/api';
 import { useEditorRevision, useRegistry } from '../hooks';
-import { Button, Section, Segmented, SliderRow, SwitchRow } from '../primitives';
+import { toolIcon } from '../icons';
+import { Button, IconButton, Section, Segmented, SliderRow, SwitchRow } from '../primitives';
 import { useUi } from '../store';
 
 // column captions for the two minecraft layers
 const LAYER_LABELS: Record<LayerId, string> = { base: 'Base', outer: 'Outer' };
 
+// grid of every registered tool, including those contributed by plugins
+export function ToolsPanel() {
+  const toolList = useRegistry(tools);
+  const activeToolId = useUi((state) => state.activeToolId);
+  const set = useUi((state) => state.set);
+  return (
+    <nav aria-label="Tools" className="grid grid-cols-[repeat(auto-fill,minmax(2.5rem,1fr))] gap-1.5 p-3">
+      {toolList.map((tool) => (
+        <IconButton
+          key={tool.id}
+          label={tool.label}
+          shortcut={tool.shortcut}
+          icon={toolIcon(tool.icon)}
+          active={tool.id === activeToolId}
+          onClick={() => set({ activeToolId: tool.id })}
+          className="h-9 w-full border border-line bg-raised"
+        />
+      ))}
+    </nav>
+  );
+}
+
+// arm model switch above the visibility matrix, everything about the character's body in one place
+export function BodyPartsPanel() {
+  return (
+    <>
+      <ModelPanel />
+      <LayersPanel />
+    </>
+  );
+}
+
 // visibility matrix for body parts and their base and outer layers
-export function LayersPanel() {
+function LayersPanel() {
   const visibility = useUi((state) => state.visibility);
   const toggle = useUi((state) => state.toggleVisibility);
   const setLayer = useUi((state) => state.setLayerVisibility);
   return (
-    <Section title="Skin layers">
+    <Section title="Visibility">
       <div className="grid grid-cols-[1fr_3rem_3rem] items-center gap-y-0.5 text-xs">
         <span />
         {LAYER_IDS.map((layer) => {
@@ -70,7 +103,7 @@ export function ToolSettingsPanel() {
   const set = useUi((state) => state.set);
   const active = toolList.find((item) => item.id === activeToolId);
   return (
-    <Section title="Tool settings">
+    <Section>
       <p className="text-xs text-fg">
         {active?.label}
         {active?.hint && <span className="text-faint"> — {active.hint}</span>}
@@ -111,7 +144,7 @@ export function ToolSettingsPanel() {
 }
 
 // arm geometry switch, applied as an undoable command
-export function ModelPanel() {
+function ModelPanel() {
   useEditorRevision();
   return (
     <Section title="Model">

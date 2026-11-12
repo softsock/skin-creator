@@ -84,3 +84,18 @@ work everywhere, including the cloud preview. The desktop adapter provides real 
 
 Bundled through `@fontsource-variable/inter` so the UI looks the same on every OS and offline, with no
 third-party font request.
+
+### 16. dockview for the modular workspace
+
+Every panel must be movable, tabbable, resizable and floatable, with a serialisable layout. dockview (MIT,
+no dependencies beyond React) provides exactly that, so the application only declares panels and a default
+arrangement. View areas use its `always` renderer so a WebGL canvas or a webview is never detached from
+the document when a tab is hidden. Its bundled themes are recoloured through CSS variables in
+`index.css`. An earlier Blockbench-style fixed layout was tried and reverted at the owner's request.
+
+### 17. `<webview>` for the integrated browser, not `WebContentsView`
+
+The browser has to live inside a dock panel that can be dragged, tabbed and floated. A `<webview>` is a
+DOM element and follows the panel for free; a `WebContentsView` would need its bounds and stacking synced
+with the dock by hand. The tag is enabled only for the main window and every attachment is validated in
+`will-attach-webview`.

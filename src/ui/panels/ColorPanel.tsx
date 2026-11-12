@@ -1,6 +1,7 @@
+import { Pipette } from 'lucide-react';
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { hexToRgba, hsvToRgba, rgbaToHex, rgbaToHsv, sameColor, type Hsv, type Rgba } from '../../core/color';
-import { Section } from '../primitives';
+import { IconButton, Section } from '../primitives';
 import { useUi } from '../store';
 
 // starter swatches chosen to cover skin tones, fabrics and accents commonly used in skins
@@ -30,6 +31,9 @@ const PALETTE = [
   '#e8c39e',
   '#ffe0c2',
 ].map((hex) => hexToRgba(hex)!);
+
+// inner edge of the hue ring as a fraction of the wheel radius
+const RING_INNER = 0.8;
 
 // tracks a pointer drag over an element and reports normalized coordinates
 function useDrag(onDrag: (x: number, y: number) => void) {
@@ -63,74 +67,116 @@ function Swatch({ color, active, onPick }: { color: Rgba; active: boolean; onPic
       title={hex}
       onClick={() => onPick(color)}
       style={{ backgroundColor: hex }}
-      className={`aspect-square rounded-[4px] ring-offset-2 ring-offset-panel transition-shadow hover:ring-1 hover:ring-fg/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent ${active ? 'ring-1 ring-fg' : ''}`}
+      className={`aspect-square rounded-md ring-offset-2 ring-offset-panel transition-shadow hover:ring-1 hover:ring-fg/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent ${active ? 'ring-1 ring-fg' : ''}`}
     />
   );
 }
 
-// hsv color picker with hex input, palette and automatically collected recent colors
+// color wheel with a hue ring around a saturation and value square, plus hex entry and eyedropper
 export function ColorPanel() {
   const color = useUi((state) => state.color);
-  const recent = useUi((state) => state.recentColors);
+  const pipette = useUi((state) => state.activeToolId === 'eyedropper');
   const set = useUi((state) => state.set);
   const [hsvState, setHsv] = useState<Hsv>(() => rgbaToHsv(color));
   const [draft, setDraft] = useState<string | null>(null);
   const hsv = sameColor(hsvToRgba(hsvState), color) ? hsvState : rgbaToHsv(color);
   const [h, s, v] = hsv;
+  const hex = rgbaToHex(color);
 
   const choose = (next: Hsv) => {
     setHsv(next);
     set({ color: hsvToRgba(next) });
   };
   const square = useDrag((x, y) => choose([h, x, 1 - y]));
-  const hue = useDrag((x) => choose([Math.min(359.9, x * 360), s, v]));
-  const pick = (next: Rgba) => set({ color: next });
+  const ring = useDrag((x, y) => {
+    const angle = (Math.atan2(x - 0.5, 0.5 - y) * 180) / Math.PI;
+    choose([Math.min(359.9, (angle + 360) % 360), s, v]);
+  });
+  const radians = (h * Math.PI) / 180;
+  const thumbRadius = (50 * (1 + RING_INNER)) / 2;
+  const inset = `${50 - (50 * RING_INNER) / Math.SQRT2 + 2.5}%`;
 
   return (
-    <Section title="Color">
-      <div
-        {...square}
-        data-testid="color-square"
-        className="relative h-32 cursor-crosshair touch-none rounded-md"
-        style={{
-          background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${h} 100% 50%))`,
-        }}
-      >
-        <span
-          className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.5)]"
-          style={{ left: `${s * 100}%`, top: `${(1 - v) * 100}%` }}
-        />
+    <Section>
+      <div className="flex items-start gap-3">
+        <div className="relative aspect-square w-[9.5rem] shrink-0">
+          <div
+            {...ring}
+            data-testid="color-ring"
+            className="absolute inset-0 cursor-pointer touch-none rounded-full"
+            style={{
+              background: 'conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)',
+              mask: `radial-gradient(closest-side, transparent ${RING_INNER * 100 - 1}%, #000 ${RING_INNER * 100}%)`,
+            }}
+          />
+          <span
+            className="pointer-events-none absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.5)]"
+            style={{
+              left: `${50 + Math.sin(radians) * thumbRadius}%`,
+              top: `${50 - Math.cos(radians) * thumbRadius}%`,
+              backgroundColor: `hsl(${h} 100% 50%)`,
+            }}
+          />
+          <div
+            {...square}
+            data-testid="color-square"
+            className="absolute cursor-crosshair touch-none rounded-[3px]"
+            style={{
+              inset,
+              background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${h} 100% 50%))`,
+            }}
+          >
+            <span
+              className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.5)]"
+              style={{ left: `${s * 100}%`, top: `${(1 - v) * 100}%` }}
+            />
+          </div>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <IconButton
+              label="Pick a color from the skin"
+              shortcut="I"
+              icon={Pipette}
+              active={pipette}
+              onClick={() => set({ activeToolId: 'eyedropper' })}
+              className="size-9 border border-line bg-raised"
+            />
+            <span
+              data-testid="color-current"
+              title={hex}
+              className="size-9 shrink-0 rounded-full border border-line-strong"
+              style={{ backgroundColor: hex }}
+            />
+          </div>
+          <input
+            aria-label="Hex color"
+            spellCheck={false}
+            value={draft ?? hex}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              const parsed = hexToRgba(event.target.value);
+              if (parsed) set({ color: parsed });
+            }}
+            onBlur={() => setDraft(null)}
+            onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()}
+            className="h-8 w-full min-w-0 rounded-lg border border-line bg-app px-2 text-center font-mono text-xs text-fg uppercase outline-none focus:border-accent"
+          />
+        </div>
       </div>
-      <div
-        {...hue}
-        className="relative h-3 cursor-ew-resize touch-none rounded-full"
-        style={{ background: 'linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' }}
-      >
-        <span
-          className="pointer-events-none absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.5)]"
-          style={{ left: `${(h / 360) * 100}%` }}
-        />
-      </div>
-      <div className="flex items-center gap-2">
-        <span
-          className="size-7 shrink-0 rounded-md border border-line-strong"
-          style={{ backgroundColor: rgbaToHex(color) }}
-        />
-        <input
-          aria-label="Hex color"
-          spellCheck={false}
-          value={draft ?? rgbaToHex(color)}
-          onChange={(event) => {
-            setDraft(event.target.value);
-            const parsed = hexToRgba(event.target.value);
-            if (parsed) set({ color: parsed });
-          }}
-          onBlur={() => setDraft(null)}
-          onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()}
-          className="h-7 min-w-0 flex-1 rounded-md border border-line bg-app px-2 font-mono text-xs text-fg uppercase outline-none focus:border-accent"
-        />
-      </div>
-      <div className="mt-1 grid grid-cols-8 gap-1.5">
+    </Section>
+  );
+}
+
+// starter swatches and automatically collected recent colors, separate so it can dock anywhere
+export function PalettePanel() {
+  const color = useUi((state) => state.color);
+  const recent = useUi((state) => state.recentColors);
+  const set = useUi((state) => state.set);
+  const pick = (next: Rgba) => set({ color: next });
+  return (
+    <Section>
+      <div className="grid grid-cols-8 gap-1.5">
         {PALETTE.map((swatch) => (
           <Swatch key={swatch.join()} color={swatch} active={sameColor(swatch, color)} onPick={pick} />
         ))}

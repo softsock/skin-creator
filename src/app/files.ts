@@ -4,7 +4,8 @@ import { decodeSkinPng, encodeSkinPng, inferSkinModel, SkinFormatError } from '.
 import { SKIN_SIZE, type SkinModel } from '../core/skin-layout';
 import type { FileRef } from '../platform/platform';
 import { useUi } from '../ui/store';
-import { editor, platform, viewportRef } from './app';
+import { editor, platform, viewportFor } from './app';
+import { showRenderView } from './views';
 
 // turns the project name into a safe file name for downloads and save dialogs
 function fileName(suffix = ''): string {
@@ -76,9 +77,14 @@ export async function saveSkin(saveAs = false): Promise<void> {
 
 // renders the studio view to a png at the chosen export scale
 export async function exportRender(): Promise<void> {
-  const viewport = viewportRef.current;
+  if (!showRenderView()) return;
+  let viewport = viewportFor(['render']);
+  for (let attempt = 0; !viewport && attempt < 30; attempt++) {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    viewport = viewportFor(['render']);
+  }
   if (!viewport) {
-    useUi.getState().notify('error', 'Studio render needs WebGL, which is unavailable here.');
+    useUi.getState().notify('error', 'The 3D Render view could not be opened.');
     return;
   }
   try {

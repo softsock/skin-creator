@@ -222,6 +222,83 @@ export function getFaceMap(model: SkinModel): Int16Array {
   return map;
 }
 
+// one part layer's uv island together with its slot in the exploded parts view
+export interface PartIsland {
+  readonly part: PartId;
+  readonly layer: LayerId;
+  readonly rect: Rect;
+  readonly x: number;
+  readonly y: number;
+}
+
+// arrangement of every island in the exploded parts view and the size of the whole sheet
+export interface PartSheet {
+  readonly islands: readonly PartIsland[];
+  readonly width: number;
+  readonly height: number;
+}
+
+// rows of the exploded parts view, paired limbs share a row
+const PART_ROWS: ReadonlyArray<readonly PartId[]> = [
+  ['head'],
+  ['body'],
+  ['rightArm', 'leftArm'],
+  ['rightLeg', 'leftLeg'],
+];
+
+// spacing in skin pixels between islands of the parts view, leaving room for captions
+const PART_GAP = 4;
+
+// cache for the parts sheet, which only depends on the arm width
+const partSheetCache = new Map<SkinModel, PartSheet>();
+
+// smallest texture rectangle containing all six faces of one part layer
+function islandBounds(model: SkinModel, part: PartId, layer: LayerId): Rect {
+  const rects = getSkinFaces(model)
+    .filter((face) => face.part === part && face.layer === layer)
+    .map((face) => face.rect);
+  const x = Math.min(...rects.map((rect) => rect.x));
+  const y = Math.min(...rects.map((rect) => rect.y));
+  return {
+    x,
+    y,
+    w: Math.max(...rects.map((rect) => rect.x + rect.w)) - x,
+    h: Math.max(...rects.map((rect) => rect.y + rect.h)) - y,
+  };
+}
+
+// lays out each part layer as its own island so the 2d parts view can show them separately
+export function getPartSheet(model: SkinModel): PartSheet {
+  let sheet = partSheetCache.get(model);
+  if (!sheet) {
+    const column = Math.max(
+      ...PART_ROWS.map(
+        (row) =>
+          row.reduce((sum, part) => sum + islandBounds(model, part, 'base').w, 0) +
+          PART_GAP * (row.length - 1),
+      ),
+    );
+    const islands: PartIsland[] = [];
+    let y = 0;
+    for (const row of PART_ROWS) {
+      let height = 0;
+      for (const [layerIndex, layer] of LAYER_IDS.entries()) {
+        let x = layerIndex * (column + PART_GAP);
+        for (const part of row) {
+          const rect = islandBounds(model, part, layer);
+          islands.push({ part, layer, rect, x, y });
+          x += rect.w + PART_GAP;
+          height = Math.max(height, rect.h);
+        }
+      }
+      y += height + PART_GAP;
+    }
+    sheet = { islands, width: LAYER_IDS.length * (column + PART_GAP) - PART_GAP, height: y - PART_GAP };
+    partSheetCache.set(model, sheet);
+  }
+  return sheet;
+}
+
 // model space corners of one texture pixel, used to draw the 3d hover cursor
 export function pixelCorners(face: SkinFace, px: number, py: number): [Vec3, Vec3, Vec3, Vec3] {
   const su = face.uLength / face.rect.w;

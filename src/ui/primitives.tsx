@@ -56,10 +56,10 @@ export function IconButton({
         aria-label={label}
         aria-pressed={active}
         className={clsx(
-          'inline-flex size-7 shrink-0 items-center justify-center rounded-md transition-colors',
+          'inline-flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors',
           'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent',
           'disabled:pointer-events-none disabled:opacity-35',
-          active ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-hover hover:text-fg',
+          active ? 'border-accent/50! bg-accent/20! text-accent' : 'text-muted hover:bg-hover hover:text-fg',
           className,
         )}
         {...props}
@@ -80,7 +80,7 @@ export function Button({
     <button
       type="button"
       className={clsx(
-        'inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',
+        'inline-flex h-7 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors',
         'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent',
         'disabled:pointer-events-none disabled:opacity-40',
         variant === 'primary' && 'bg-accent text-accent-fg hover:bg-accent/90',
@@ -113,7 +113,7 @@ export function Segmented<T extends string>({
       value={value}
       aria-label={label}
       onValueChange={(next) => next && onChange(next as T)}
-      className={clsx('inline-flex h-7 rounded-md border border-line bg-app p-0.5', className)}
+      className={clsx('inline-flex h-8 rounded-[10px] border border-line bg-app p-0.5', className)}
     >
       {options.map((option) => (
         <ToggleGroup.Item
@@ -121,9 +121,9 @@ export function Segmented<T extends string>({
           value={option.value}
           disabled={option.disabled}
           className={clsx(
-            'inline-flex flex-auto items-center justify-center gap-1.5 rounded-[5px] px-2.5 text-xs font-medium whitespace-nowrap text-muted transition-colors',
+            'inline-flex flex-auto items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium whitespace-nowrap text-muted transition-colors',
             'hover:text-fg focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40',
-            'data-[state=on]:bg-hover data-[state=on]:text-fg',
+            'data-[state=on]:bg-accent/20 data-[state=on]:text-fg data-[state=on]:shadow-[inset_0_0_0_1px_rgb(174_184_246/0.35)]',
           )}
         >
           {option.icon && <option.icon className="size-3.5" strokeWidth={1.75} />}
@@ -206,22 +206,24 @@ export function SwitchRow({
   );
 }
 
-// titled sidebar section giving every panel the same rhythm
+// sidebar section with an optional title, giving every panel the same rhythm
 export function Section({
   title,
   action,
   children,
 }: {
-  title: string;
+  title?: string;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="border-b border-line px-3 py-3">
-      <header className="mb-2.5 flex h-5 items-center justify-between">
-        <h2 className="text-[11px] font-semibold tracking-wide text-muted uppercase">{title}</h2>
-        {action}
-      </header>
+    <section className="border-b border-line px-3 py-3 last:border-b-0">
+      {title && (
+        <header className="mb-2.5 flex h-5 items-center justify-between">
+          <h2 className="text-[11px] font-semibold tracking-wide text-muted uppercase">{title}</h2>
+          {action}
+        </header>
+      )}
       <div className="flex flex-col gap-2">{children}</div>
     </section>
   );

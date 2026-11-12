@@ -4,7 +4,14 @@ import { PixelPatchCommand, ReplaceSkinCommand, SetModelCommand } from './comman
 import { createDefaultSkin } from './default-skin';
 import { Editor } from './editor';
 import { intersectFaces } from './picking';
-import { getFaceMap, getSkinFaces, pixelCorners, SKIN_SIZE, type SkinFace } from './skin-layout';
+import {
+  getFaceMap,
+  getPartSheet,
+  getSkinFaces,
+  pixelCorners,
+  SKIN_SIZE,
+  type SkinFace,
+} from './skin-layout';
 
 // finds one face by its coordinates in the layout for readable assertions
 function face(model: 'classic' | 'slim', part: string, layer: string, side: string): SkinFace {
@@ -53,6 +60,36 @@ describe('skin layout', () => {
       const used = owners.reduce((sum, n) => sum + n, 0);
       expect(used).toBe(model === 'classic' ? 3264 : 3136);
       expect(getFaceMap(model).filter((index) => index >= 0).length).toBe(used);
+    }
+  });
+
+  it('gives every mapped pixel exactly one island in the parts sheet without overlaps', () => {
+    for (const model of ['classic', 'slim'] as const) {
+      const { islands, width, height } = getPartSheet(model);
+      expect(islands).toHaveLength(12);
+      const map = getFaceMap(model);
+      for (let i = 0; i < SKIN_SIZE * SKIN_SIZE; i++) {
+        if (map[i]! < 0) continue;
+        const x = i % SKIN_SIZE;
+        const y = Math.floor(i / SKIN_SIZE);
+        const owners = islands.filter(
+          ({ rect }) => x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h,
+        );
+        expect(owners).toHaveLength(1);
+        const owner = getSkinFaces(model)[map[i]!]!;
+        expect([owners[0]!.part, owners[0]!.layer]).toEqual([owner.part, owner.layer]);
+      }
+      const taken = new Set<number>();
+      for (const { rect, x, y } of islands) {
+        expect(x + rect.w).toBeLessThanOrEqual(width);
+        expect(y + rect.h).toBeLessThanOrEqual(height);
+        for (let py = y; py < y + rect.h; py++) {
+          for (let px = x; px < x + rect.w; px++) {
+            expect(taken.has(py * width + px)).toBe(false);
+            taken.add(py * width + px);
+          }
+        }
+      }
     }
   });
 
