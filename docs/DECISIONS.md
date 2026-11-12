@@ -84,3 +84,11 @@ work everywhere, including the cloud preview. The desktop adapter provides real 
 
 Bundled through `@fontsource-variable/inter` so the UI looks the same on every OS and offline, with no
 third-party font request.
+
+### 16. Blockbench-style workspace, written from scratch
+
+The layout, panel names (UV, Textures, Outliner, Color), flat blue-grey theme and floor grid follow
+Blockbench because skin artists already know where things are there. Only the arrangement and palette are
+modelled on it; no Blockbench code, icons or fonts are used, since it is GPL and this project is MIT. Icons
+stay lucide and the font stays Inter. The floor grid is an editing aid: it belongs to the editor look
+only, fades out in Studio mode and is never part of an exported render.

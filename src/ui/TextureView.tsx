@@ -46,7 +46,7 @@ export function TextureView() {
       SKIN_SIZE,
       SKIN_SIZE,
     );
-    const checker = pixelCanvas((x, y) => ((x + y) % 2 === 0 ? '#1c1d21' : '#222429'));
+    const checker = pixelCanvas((x, y) => ((x + y) % 2 === 0 ? '#1c2026' : '#252a32'));
     let mask = pixelCanvas(() => null);
     let zoom = 8;
     let panX = 0;
@@ -60,10 +60,9 @@ export function TextureView() {
 
     const fit = () => {
       const { clientWidth: w, clientHeight: h } = container;
-      const top = 44;
-      zoom = Math.max(2, Math.floor(Math.min(w - 32, h - top - 16) / SKIN_SIZE));
+      zoom = Math.max(2, Math.floor(Math.min(w - 16, h - 16) / SKIN_SIZE));
       panX = Math.round((w - SKIN_SIZE * zoom) / 2);
-      panY = top + Math.round((h - top - SKIN_SIZE * zoom) / 2);
+      panY = Math.round((h - SKIN_SIZE * zoom) / 2);
     };
 
     const syncSize = (): boolean => {
@@ -86,7 +85,7 @@ export function TextureView() {
       const faces = getSkinFaces(editor.skin.model);
       if (modelDirty) {
         const faceMap = getFaceMap(editor.skin.model);
-        mask = pixelCanvas((x, y) => (faceMap[y * SKIN_SIZE + x]! < 0 ? 'rgba(14,15,17,0.78)' : null));
+        mask = pixelCanvas((x, y) => (faceMap[y * SKIN_SIZE + x]! < 0 ? 'rgba(24,26,31,0.78)' : null));
         modelDirty = false;
       }
       if (pixelsDirty) {
@@ -117,7 +116,7 @@ export function TextureView() {
       ctx.lineWidth = 1;
       for (const face of faces) {
         const { x, y, w: fw, h: fh } = face.rect;
-        ctx.strokeStyle = face.layer === 'base' ? 'rgba(255,255,255,0.2)' : 'rgba(62,207,142,0.38)';
+        ctx.strokeStyle = face.layer === 'base' ? 'rgba(255,255,255,0.2)' : 'rgba(62,144,255,0.38)';
         ctx.strokeRect(panX + x * zoom + 0.5, panY + y * zoom + 0.5, fw * zoom - 1, fh * zoom - 1);
       }
       ctx.strokeStyle = 'rgba(255,255,255,0.12)';
@@ -128,7 +127,7 @@ export function TextureView() {
         ctx.textBaseline = 'top';
         for (const face of faces) {
           if (face.face !== 'right') continue;
-          ctx.fillStyle = face.layer === 'base' ? 'rgba(231,232,235,0.6)' : 'rgba(62,207,142,0.8)';
+          ctx.fillStyle = face.layer === 'base' ? 'rgba(202,202,212,0.7)' : 'rgba(110,172,255,0.9)';
           ctx.fillText(
             PART_CAPTIONS[face.part],
             panX + face.rect.x * zoom + 3,
@@ -250,7 +249,7 @@ export function TextureView() {
   }, []);
 
   return (
-    <div ref={containerRef} className="h-full w-full overflow-hidden bg-panel">
+    <div ref={containerRef} className="h-full w-full overflow-hidden bg-app">
       <canvas
         ref={canvasRef}
         data-testid="texture-view"

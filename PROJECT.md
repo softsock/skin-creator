@@ -14,6 +14,8 @@ order: frontend quality, a dependable editor, the studio renderer, extensibility
 - Painting directly on the 3D model and in a 2D texture view, both driven by one Skin Document.
 - Undo/redo for every change, one step per stroke.
 - Body part and layer visibility, 3D / split / 2D views, orbit, pan and zoom.
+- Blockbench-style workspace: menu bar, mode selector, docked UV, Textures, Color and Outliner panels,
+  toolbar with tool options above the viewport, floor grid in the editor.
 - Studio mode (F9): three lighting presets, soft shadows, ambient occlusion, backdrops, adjustable field of
   view, PNG export at 1×/2×/4× with optional transparent background.
 - Extension registries for tools, panels, actions, shortcuts and lighting presets, a versioned plugin API

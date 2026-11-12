@@ -7,6 +7,7 @@ import {
   CanvasTexture,
   Color,
   DirectionalLight,
+  GridHelper,
   HalfFloatType,
   HemisphereLight,
   LineBasicMaterial,
@@ -61,6 +62,7 @@ interface LookValues {
   shadow: number;
   ao: number;
   vignette: number;
+  grid: number;
   fov: number;
 }
 
@@ -104,6 +106,7 @@ function toValues(look: ViewportLook): LookValues {
     shadow: lighting.shadow,
     ao: lighting.ao,
     vignette: lighting.vignette,
+    grid: lighting.grid ?? 0,
     fov: look.fov,
   };
 }
@@ -127,6 +130,7 @@ function mixValues(a: LookValues, b: LookValues, t: number): LookValues {
     shadow: mix(a.shadow, b.shadow),
     ao: mix(a.ao, b.ao),
     vignette: mix(a.vignette, b.vignette),
+    grid: mix(a.grid, b.grid),
     fov: mix(a.fov, b.fov),
   };
 }
@@ -145,6 +149,7 @@ export class SkinViewport {
   private readonly hemisphere = new HemisphereLight(0xffffff, 0xffffff, 0);
   private readonly lights = [new DirectionalLight(), new DirectionalLight(), new DirectionalLight()];
   private readonly ground: Mesh;
+  private readonly grid = new GridHelper(64, 16, 0x5c6577, 0x3c4350);
   private readonly hover: LineLoop[];
   private readonly background = new Color();
   private readonly backdropCanvas = document.createElement('canvas');
@@ -196,6 +201,10 @@ export class SkinViewport {
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
+    this.grid.position.y = -0.02;
+    this.grid.material.transparent = true;
+    this.grid.material.depthWrite = false;
+    this.scene.add(this.grid);
 
     this.hover = [0x000000, 0xffffff].map((color) => {
       const geometry = new BufferGeometry();
@@ -343,10 +352,13 @@ export class SkinViewport {
     const { width, height } = this.exportSize(scale);
     const hoverVisible = this.hover.map((line) => line.visible);
     for (const line of this.hover) line.visible = false;
+    const gridVisible = this.grid.visible;
+    this.grid.visible = false;
     this.setRenderSize(width, height, 1);
     this.composer.render();
     const blob = await new Promise<Blob | null>((resolve) => this.canvas.toBlob(resolve, 'image/png'));
     this.hover.forEach((line, i) => (line.visible = hoverVisible[i]!));
+    this.grid.visible = gridVisible;
     this.resize();
     if (!blob) throw new Error('The browser could not encode the render.');
     return blob;
@@ -359,6 +371,7 @@ export class SkinViewport {
     this.resizeObserver.disconnect();
     this.controls.dispose();
     this.skinObject.dispose();
+    this.grid.dispose();
     this.scene.environment?.dispose();
     this.gtao.dispose();
     this.composer.dispose();
@@ -408,6 +421,8 @@ export class SkinViewport {
     this.lights[0]!.castShadow = shadows;
     this.lights[0]!.shadow.intensity = values.shadow;
     this.ground.visible = shadows;
+    this.grid.visible = values.grid > 0.01;
+    this.grid.material.opacity = values.grid;
     this.gtao.enabled = values.ao > 0.01;
     this.gtao.blendIntensity = values.ao;
     if (this.camera.fov !== values.fov) {

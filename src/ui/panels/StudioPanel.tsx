@@ -17,13 +17,11 @@ const BACKDROPS: ReadonlyArray<{ label: string; color: string | null }> = [
   { label: 'Moss', color: '#27362c' },
 ];
 
-// sidebar for studio mode: lighting, backdrop, camera, effects and render export
-export function StudioPanel() {
+// left studio sidebar: the lighting preset and the backdrop behind the character
+export function StudioScenePanels() {
   const studio = useUi((state) => state.studio);
   const setStudio = useUi((state) => state.setStudio);
   const presetList = useRegistry(presets);
-  useUi((state) => state.viewportSize);
-  const size = viewportRef.current?.exportSize(studio.exportScale);
 
   return (
     <>
@@ -38,7 +36,7 @@ export function StudioPanel() {
                 role="radio"
                 aria-checked={active}
                 onClick={() => setStudio({ presetId: preset.id })}
-                className={`flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-accent ${active ? 'border-accent/60 bg-accent/10' : 'border-line hover:border-line-strong hover:bg-hover'}`}
+                className={`flex items-center gap-2.5 rounded-md border px-2 py-1.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-accent ${active ? 'border-accent bg-selected' : 'border-transparent bg-back hover:bg-hover'}`}
               >
                 <span
                   className="size-6 shrink-0 rounded-full border border-white/10"
@@ -88,11 +86,23 @@ export function StudioPanel() {
           onChange={(transparent) => setStudio({ transparent })}
         />
       </Section>
+    </>
+  );
+}
 
+// right studio sidebar: camera, effects and the render export
+export function StudioOutputPanels() {
+  const studio = useUi((state) => state.studio);
+  const setStudio = useUi((state) => state.setStudio);
+  useUi((state) => state.viewportSize);
+  const size = viewportRef.current?.exportSize(studio.exportScale);
+
+  return (
+    <>
       <Section
         title="Camera"
         action={
-          <Button onClick={() => viewportRef.current?.resetCamera()} className="-mr-1.5 h-6 px-1.5">
+          <Button onClick={() => viewportRef.current?.resetCamera()} className="h-5 px-1.5">
             <RotateCcw className="size-3" /> Reset
           </Button>
         }
@@ -123,7 +133,7 @@ export function StudioPanel() {
         />
       </Section>
 
-      <Section title="Export render">
+      <Section title="Render">
         <div className="flex items-center gap-3 text-xs">
           <span className="w-20 shrink-0 text-muted">Resolution</span>
           <Segmented<string>

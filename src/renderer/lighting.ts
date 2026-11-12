@@ -27,6 +27,7 @@ export interface LightingPreset {
   readonly shadow: number;
   readonly ao: number;
   readonly vignette: number;
+  readonly grid?: number;
 }
 
 // flat, shadowless and untonemapped look so painted colors match the picker while editing
@@ -34,7 +35,7 @@ export const EDITOR_LIGHTING: LightingPreset = {
   id: 'editor',
   label: 'Editor',
   description: 'Even lighting for accurate painting.',
-  background: '#16171a',
+  background: '#1c2026',
   ambient: 1.9,
   hemisphere: { sky: '#ffffff', ground: '#ffffff', intensity: 0 },
   key: { color: '#ffffff', intensity: 1.25, position: [8, 10, 15] },
@@ -46,6 +47,7 @@ export const EDITOR_LIGHTING: LightingPreset = {
   shadow: 0,
   ao: 0,
   vignette: 0,
+  grid: 1,
 };
 
 // built-in studio looks, registered at startup through the same registry plugins can extend

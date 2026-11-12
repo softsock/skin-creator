@@ -33,7 +33,7 @@ async function exportSkin(page: Page): Promise<Uint8Array> {
 
 // imports a png through the file menu
 async function importSkin(page: Page, name: string, bytes: Uint8Array): Promise<void> {
-  await page.getByRole('button', { name: 'File' }).click();
+  await page.getByRole('menuitem', { name: 'File', exact: true }).click();
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
     page.getByRole('menuitem', { name: /Open PNG/ }).click(),
@@ -129,7 +129,7 @@ test('a drag is one undo step, dragging empty space orbits instead of painting',
 
 test('fill, eraser, eyedropper and the outer layer target work from the 3d view', async ({ page }) => {
   await open(page);
-  await page.getByRole('button', { name: 'File' }).click();
+  await page.getByRole('menuitem', { name: 'File', exact: true }).click();
   await page.getByRole('menuitem', { name: 'New blank skin' }).click();
   const baseline = await exportSkin(page);
   expect(baseline.every((value) => value === 0)).toBe(true);
@@ -227,7 +227,7 @@ test('f9 switches to studio mode and exports opaque and transparent renders', as
   const edit = await capture(viewport(page));
   await page.keyboard.press('F9');
   await expect(page.getByRole('radiogroup', { name: 'Lighting preset' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Pencil' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Pencil' })).toBeHidden();
   await page.waitForTimeout(900);
   const studio = await capture(viewport(page));
   expect(studio.at(0.5, 0.5)).not.toEqual(edit.at(0.5, 0.5));
