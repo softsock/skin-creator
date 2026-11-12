@@ -66,16 +66,23 @@ export function TextureView() {
       panY = top + Math.round((h - top - SKIN_SIZE * zoom) / 2);
     };
 
-    const draw = () => {
-      frame = 0;
+    const syncSize = (): boolean => {
       const { clientWidth: w, clientHeight: h } = container;
-      if (w === 0 || h === 0) return;
+      if (w === 0 || h === 0) return false;
       const dpr = window.devicePixelRatio;
       if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
         canvas.width = Math.round(w * dpr);
         canvas.height = Math.round(h * dpr);
         if (!userMoved) fit();
       }
+      return true;
+    };
+
+    const draw = () => {
+      frame = 0;
+      if (!syncSize()) return;
+      const { clientWidth: w, clientHeight: h } = container;
+      const dpr = window.devicePixelRatio;
       const faces = getSkinFaces(editor.skin.model);
       if (modelDirty) {
         const faceMap = getFaceMap(editor.skin.model);
@@ -145,6 +152,7 @@ export function TextureView() {
     };
 
     const targetAt = (event: PointerEvent): PixelTarget | null => {
+      syncSize();
       const rect = canvas.getBoundingClientRect();
       const x = Math.floor((event.clientX - rect.left - panX) / zoom);
       const y = Math.floor((event.clientY - rect.top - panY) / zoom);
