@@ -66,6 +66,21 @@ async function capture(locator: Locator) {
   return { png, at };
 }
 
+// the button of a tool in the tools panel, pressed while that tool is active
+const toolButton = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
+
+// the dock tab with the given title
+const tab = (page: Page, title: string) => page.locator('.dv-tab', { hasText: title });
+
+// the dock group that contains the given content
+const group = (page: Page, content: Locator) => page.locator('.dv-groupview', { has: content });
+
+// opens a new view tab through the plus button of the group that contains the given content
+async function newTab(page: Page, inGroupOf: Locator, kind: string): Promise<void> {
+  await group(page, inGroupOf).getByRole('button', { name: 'New tab' }).click();
+  await page.getByRole('menuitem', { name: kind, exact: true }).click();
+}
+
 test('renders the character and paints single pixels on the 3d model with undo and redo', async ({
   page,
 }) => {
@@ -77,8 +92,6 @@ test('renders the character and paints single pixels on the 3d model with undo a
   expect(baseline).toEqual(createDefaultSkin('classic'));
 
   const center = await pointIn(viewport(page));
-  await page.mouse.move(center.x, center.y);
-  await expect(page.getByTestId('status-pixel')).toContainText('Body · Base · front');
   await page.mouse.click(center.x, center.y);
   await expect(page.getByTestId('dirty-indicator')).toBeVisible();
 
@@ -88,8 +101,6 @@ test('renders the character and paints single pixels on the 3d model with undo a
   const face = getSkinFaces('classic')[getFaceMap('classic')[changed[0]!]!]!;
   expect([face.part, face.layer, face.face]).toEqual(['body', 'base', 'front']);
   expect([...painted.slice(changed[0]! * 4, changed[0]! * 4 + 4)]).toEqual(PENCIL);
-  const status = await page.getByTestId('status-pixel').textContent();
-  expect(status).toContain(`${changed[0]! % SKIN_SIZE}, ${Math.floor(changed[0]! / SKIN_SIZE)}`);
 
   await page.keyboard.press('Control+z');
   expect(await exportSkin(page)).toEqual(baseline);
@@ -136,7 +147,7 @@ test('fill, eraser, eyedropper and the outer layer target work from the 3d view'
   const center = await pointIn(viewport(page));
 
   await page.keyboard.press('g');
-  await expect(page.getByTestId('status-tool')).toHaveText('Fill');
+  await expect(toolButton(page, 'Fill')).toHaveAttribute('aria-pressed', 'true');
   await page.mouse.click(center.x, center.y);
   const filled = await exportSkin(page);
   const region = diff(baseline, filled);
@@ -204,29 +215,25 @@ test('import and export round-trip pixels exactly for classic and slim skins', a
 test('the 2d parts and atlas views edit the same document', async ({ page }) => {
   await open(page);
   const baseline = await exportSkin(page);
-  const pixelAt = async (texture: Locator, fx: number, fy: number) => {
+  const paintAt = async (texture: Locator, fx: number, fy: number) => {
     const spot = await pointIn(texture, fx, fy);
-    await page.mouse.move(spot.x, spot.y);
-    await expect(page.getByTestId('status-pixel')).toContainText('·');
-    const status = (await page.getByTestId('status-pixel').textContent())!;
-    const [x, y] = status.split(' · ')[0]!.split(', ').map(Number) as [number, number];
     await page.mouse.click(spot.x, spot.y);
-    return { index: y * SKIN_SIZE + x, status };
+    const changed = diff(baseline, await exportSkin(page));
+    expect(changed).toHaveLength(1);
+    return getSkinFaces('classic')[getFaceMap('classic')[changed[0]!]!]!;
   };
 
-  const parts = page.getByTestId('view-b').getByTestId('texture-view');
+  const parts = page.getByTestId('view-2').getByTestId('texture-view');
   await expect(parts).toBeVisible();
-  const first = await pixelAt(parts, 0.3, 0.3);
-  expect(first.status).toContain('Head · Base');
-  expect(diff(baseline, await exportSkin(page))).toEqual([first.index]);
+  const first = await paintAt(parts, 0.3, 0.3);
+  expect([first.part, first.layer]).toEqual(['head', 'base']);
 
-  await page.getByTestId('view-a').click({ position: { x: 5, y: 5 } });
+  await page.getByTestId('view-1').click({ position: { x: 5, y: 5 } });
   await page.keyboard.press('Control+z');
   await page.keyboard.press('2');
   await expect(viewport(page)).toHaveCount(0);
-  const atlas = page.getByTestId('view-a').getByTestId('texture-view');
-  const second = await pixelAt(atlas, 0.5, 0.36);
-  expect(diff(baseline, await exportSkin(page))).toEqual([second.index]);
+  await expect(tab(page, '2D')).toHaveCount(2);
+  await paintAt(page.getByTestId('view-1').getByTestId('texture-view'), 0.5, 0.36);
 
   await page.keyboard.press('1');
   await expect(viewport(page)).toBeVisible();
@@ -240,7 +247,8 @@ test('f9 switches to the studio render and exports opaque and transparent render
   await page.keyboard.press('F9');
   await expect(page.getByRole('radiogroup', { name: 'Lighting preset' })).toBeVisible();
   await expect(page.getByRole('radio', { name: 'Render', exact: true })).toBeChecked();
-  await expect(page.getByRole('radio', { name: '3D Render' })).toBeChecked();
+  await expect(tab(page, '3D Render')).toBeVisible();
+  await expect(tab(page, '3D Preview')).toHaveCount(0);
   await page.waitForTimeout(900);
   const studio = await capture(viewport(page));
   expect(studio.at(0.5, 0.5)).not.toEqual(edit.at(0.5, 0.5));
@@ -292,7 +300,7 @@ test('the example extension contributes tools and a panel and can be disabled', 
   await expect(page.getByRole('heading', { name: 'Shading' })).toBeVisible();
 
   await page.keyboard.press('d');
-  await expect(page.getByTestId('status-tool')).toHaveText('Darken');
+  await expect(toolButton(page, 'Darken')).toHaveAttribute('aria-pressed', 'true');
   const center = await pointIn(viewport(page));
   await page.mouse.click(center.x, center.y);
   const darkened = await exportSkin(page);
@@ -303,28 +311,36 @@ test('the example extension contributes tools and a panel and can be disabled', 
   await page.getByRole('switch', { name: 'Shading tools' }).click();
   await expect(page.getByRole('button', { name: 'Lighten' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Shading' })).toHaveCount(0);
-  await expect(page.getByTestId('status-tool')).toHaveText('Pencil');
+  await expect(toolButton(page, 'Pencil')).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('the browser view explains that it is desktop-only on the web', async ({ page }) => {
+test('a browser tab explains that it is desktop-only on the web', async ({ page }) => {
   await open(page);
-  await page.getByRole('radio', { name: 'NameMC' }).click();
+  await group(page, viewport(page)).getByRole('button', { name: 'New tab' }).click();
+  await expect(page.getByRole('menuitem')).toHaveText([
+    '2D',
+    '2D Parts',
+    '3D Preview',
+    '3D Render',
+    'Browser',
+  ]);
+  await page.getByRole('menuitem', { name: 'Browser' }).click();
   await expect(page.getByText('Integrated browser is a desktop feature')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Open NameMC in a new tab' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Open a new browser tab' })).toHaveAttribute(
     'href',
-    'https://namemc.com/minecraft-skins',
+    'https://duckduckgo.com/',
   );
-  await expect(viewport(page)).toHaveCount(0);
-  await page.getByRole('radio', { name: '3D', exact: true }).click();
+  await expect(viewport(page)).toBeHidden();
+  await tab(page, '3D Preview').click();
   await expect(viewport(page)).toBeVisible();
 });
 
 test('rendering from an editing view switches it to the studio look first', async ({ page }) => {
   await open(page);
   const box = (await viewport(page).boundingBox())!;
-  const render = decode(await download(page, () => page.getByRole('button', { name: 'Render' }).click()));
+  const render = decode(await download(page, () => page.keyboard.press('Control+e')));
   expect([render.width, render.height]).toEqual([Math.round(box.width) * 2, Math.round(box.height) * 2]);
-  await expect(page.getByRole('radio', { name: '3D Render' })).toBeChecked();
+  await expect(tab(page, '3D Render')).toBeVisible();
   await page.waitForTimeout(900);
   const live = await capture(viewport(page));
   const offset =
@@ -337,13 +353,12 @@ test('rendering from an editing view switches it to the studio look first', asyn
 test('panels float, close, reopen and move, and the layout persists until it is reset', async ({ page }) => {
   await open(page);
   const hex = page.getByLabel('Hex color');
-  const group = (content: Locator) => page.locator('.dv-groupview', { has: content });
   const viewMenuItem = async (name: string) => {
     await page.getByRole('button', { name: 'View', exact: true }).click();
     await page.getByRole(name === 'Reset layout' ? 'menuitem' : 'menuitemcheckbox', { name }).click();
   };
 
-  await group(hex).getByRole('button', { name: 'Float this panel' }).click();
+  await group(page, hex).getByRole('button', { name: 'Float this panel' }).click();
   await expect(page.locator('.dv-resize-container', { has: hex })).toBeVisible();
 
   await viewMenuItem('Color');
@@ -354,22 +369,63 @@ test('panels float, close, reopen and move, and the layout persists until it is 
   const swatch = page.getByRole('button', { name: 'Use color #1a1c2c' });
   await page
     .getByText('Palette', { exact: true })
-    .dragTo(group(page.getByRole('button', { name: 'Pencil' })).locator('.dv-content-container'));
-  await expect(group(swatch).getByText('Tools', { exact: true })).toHaveCount(1);
+    .dragTo(group(page, toolButton(page, 'Pencil')).locator('.dv-content-container'));
+  await expect(group(page, swatch).getByText('Tools', { exact: true })).toHaveCount(1);
 
-  await page.getByRole('button', { name: 'Swap the two views' }).click();
-  await expect(page.getByTestId('view-a').getByTestId('texture-view')).toBeVisible();
-  await expect(page.getByTestId('view-b').getByTestId('viewport-3d')).toBeVisible();
-
-  await page.getByRole('button', { name: 'Show one view' }).click();
-  await expect(page.getByTestId('view-b')).toHaveCount(0);
   await page.reload();
-  await expect(page.getByTestId('view-a').getByTestId('texture-view')).toBeVisible();
-  await expect(page.getByTestId('view-b')).toHaveCount(0);
   await expect(page.locator('.dv-resize-container', { has: hex })).toBeVisible();
+  await expect(group(page, swatch).getByText('Tools', { exact: true })).toHaveCount(1);
 
   await viewMenuItem('Reset layout');
-  await expect(page.getByTestId('view-b')).toBeVisible();
   await expect(page.locator('.dv-resize-container')).toHaveCount(0);
-  await expect(group(swatch).getByText('Tools', { exact: true })).toHaveCount(0);
+  await expect(group(page, swatch).getByText('Tools', { exact: true })).toHaveCount(0);
+});
+
+test('a node holds several view tabs opened from its plus button and remembers them', async ({ page }) => {
+  await open(page);
+  const baseline = await exportSkin(page);
+  const node = group(page, viewport(page));
+  await expect(page.getByRole('radiogroup', { name: 'View content' })).toHaveCount(0);
+  await expect(page.locator('footer')).toHaveCount(0);
+
+  await newTab(page, viewport(page), '2D');
+  await expect(node.locator('.dv-tab')).toHaveText(['3D Preview', '2D']);
+  const atlas = page.getByTestId('view-3').getByTestId('texture-view');
+  await expect(atlas).toBeVisible();
+  await expect(viewport(page)).toBeHidden();
+  const spot = await pointIn(atlas, 0.5, 0.36);
+  await page.mouse.click(spot.x, spot.y);
+  expect(diff(baseline, await exportSkin(page))).toHaveLength(1);
+
+  await newTab(page, atlas, '3D Render');
+  await expect(node.locator('.dv-tab')).toHaveText(['3D Preview', '2D', '3D Render']);
+  await expect(page.getByRole('radio', { name: 'Render', exact: true })).toBeChecked();
+
+  await tab(page, '3D Preview').dragTo(
+    group(page, page.getByTestId('view-2')).locator('.dv-content-container'),
+  );
+  await expect(group(page, page.getByTestId('view-2')).locator('.dv-tab')).toHaveText([
+    '2D Parts',
+    '3D Preview',
+  ]);
+  await expect(node.locator('.dv-tab')).toHaveText(['2D', '3D Render']);
+
+  await page.reload();
+  await expect(node.locator('.dv-tab')).toHaveText(['2D', '3D Render']);
+  await expect(group(page, page.getByTestId('view-2')).locator('.dv-tab')).toHaveText([
+    '2D Parts',
+    '3D Preview',
+  ]);
+  await expect(page.getByTestId('view-1').getByTestId('viewport-3d')).toBeVisible();
+
+  await tab(page, '3D Render').locator('.dv-default-tab-action').click();
+  await expect(tab(page, '3D Render')).toHaveCount(0);
+  await expect(page.getByRole('radio', { name: 'Editor' })).toBeChecked();
+
+  await page.getByRole('button', { name: 'View', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Reset layout' }).click();
+  await expect(page.locator('.dv-tab', { hasText: /^(3D Preview|2D Parts|2D|3D Render)$/ })).toHaveText([
+    '3D Preview',
+    '2D Parts',
+  ]);
 });

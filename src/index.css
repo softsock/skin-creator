@@ -93,3 +93,10 @@ input {
 .dockview-theme-abyss-spaced .dv-groupview {
   border: 1px solid var(--color-line);
 }
+
+/* centers the new tab and float buttons on the tab row instead of leaving them at its top edge */
+.dockview-theme-abyss-spaced .dv-left-actions-container,
+.dockview-theme-abyss-spaced .dv-right-actions-container {
+  display: flex;
+  align-items: center;
+}
