@@ -6,6 +6,17 @@ their behaviour come from the code, not from observation. Dependency versions ar
 
 ## Reference projects
 
+| Project        | Licence          | Version | Last commit seen | three.js     | Plugin runtime               |
+| -------------- | ---------------- | ------- | ---------------- | ------------ | ---------------------------- |
+| Blockbench     | GPL-3.0-or-later | 5.2.2   | 2026-10-18       | `^0.129`     | yes, same realm, unsandboxed |
+| MC Skin Editor | Apache-2.0       | 1.4.0   | 2026-11-10       | `^0.186`     | none                         |
+| Skin Anvil     | MIT              | –       | 2026-07-22       | `0.156.1`    | none                         |
+| skinview3d     | MIT              | 3.4.2   | 2026-05-02       | `^0.156`     | none                         |
+| Skinforge      | AGPL-3.0-only    | 1.3.0   | 2026-09-10       | r128 via CDN | yes, same realm, unsandboxed |
+
+All five are under active or recent development. Two are copyleft, so their code may be studied but not
+copied into this MIT project.
+
 ### Blockbench – GPL-3.0-or-later, active
 
 - three.js `^0.129`, Vue 2, Electron ([package.json](https://github.com/JannisX11/blockbench/blob/master/package.json)).
@@ -101,7 +112,10 @@ their behaviour come from the code, not from observation. Dependency versions ar
   The shadow pass copies `map` and `alphaTest`, so cut-out overlays cast correct shadows.
 - Ambient occlusion: `GTAOPass`, `SAOPass` and `SSAOPass` render normals with an override material and
   therefore ignore cut-outs ([GTAOPass](https://threejs.org/docs/pages/GTAOPass.html)). `postprocessing`
-  (Zlib) and `n8ao` are alternatives; `n8ao` states ISC on npm and CC0 in its repository.
+  (Zlib) and `n8ao` are alternatives; `n8ao` states ISC on npm and CC0 in its repository. The research
+  advice was to ship without AO until it had been checked against transparent overlays. We checked it on
+  the starter skin, whose head, body and arms have partly transparent outer layers, saw no visible
+  artefacts in the three presets, and kept it behind a switch with the limitation documented.
 - `EffectComposer` needs a render target with `samples` for MSAA, and `OutputPass` applies tone mapping
   and the output colour space ([OutputPass](https://threejs.org/docs/pages/OutputPass.html)).
 - `RoomEnvironment` with `PMREMGenerator` gives image-based light without shipping HDR files.
@@ -140,10 +154,46 @@ their behaviour come from the code, not from observation. Dependency versions ar
   alpha on the base layer ([Minecraft Wiki](https://minecraft.wiki/w/Skin)).
 - Classic uses 3264 of 4096 texels, slim 3136. Unused texels must survive a round-trip.
 - Legacy 64×32 skins contain only right limbs and a head overlay; conversion mirrors them to the left side
-  ([skinview-utils](https://github.com/bs-community/skinview-utils/blob/master/src/process.ts)).
+  and repairs head overlays that were saved fully opaque
+  ([skinview-utils](https://github.com/bs-community/skinview-utils/blob/master/src/process.ts)). MC Skin
+  Editor instead mirrors at render time without converting the atlas.
+
+## Limits other editors place on third-party plugins
+
+- Blockbench and Skinforge both run plugin code with `new Function` inside the application's own realm.
+  A plugin can reach every global, so their permission prompts are advisory, not enforced.
+- Blockbench gates native modules and file access per plugin, but its window still runs with Node
+  integration and without context isolation.
+- Skinforge cannot unload a plugin; disabling one reloads the editor.
+- MC Skin Editor, Skin Anvil and skinview3d have no plugin runtime at all.
+
+What we took from this: registrations must be disposable so a plugin can be switched off live, permissions
+must be checked by the host on every call, and untrusted code must wait for a real isolation boundary.
 
 ## Reuse versus build
 
 Reused: three.js with its OrbitControls, post-processing passes and RoomEnvironment; fast-png; Radix
 primitives; lucide icons; zustand. Written here: document, commands, layout table, picking, tools,
 registries, plugin host, lighting presets and the UI.
+
+## Our dependencies
+
+Versions and licences as published on npm on 2026-11-12.
+
+| Package                            | Version    | Licence    | Note                                                          |
+| ---------------------------------- | ---------- | ---------- | ------------------------------------------------------------- |
+| three                              | 0.187.0    | MIT        | current release, includes the post-processing passes          |
+| react, react-dom                   | 19.3       | MIT        |                                                               |
+| zustand                            | 5.1        | MIT        |                                                               |
+| radix-ui                           | 1.8        | MIT        | unstyled primitives, styled with Tailwind                     |
+| lucide-react                       | 1.72       | ISC        |                                                               |
+| fast-png                           | 8.0.0      | MIT        | last published 2025-12; palette encoder quirk, see decision 5 |
+| clsx                               | 2.1        | MIT        |                                                               |
+| @fontsource-variable/inter         | 5.3        | OFL-1.1    | font files only                                               |
+| electron (dev)                     | 45.3       | MIT        | downloads its binary on first use, no install script          |
+| vite, vitest, tailwindcss (dev)    | 8 / 5 / 4  | MIT        |                                                               |
+| typescript, @playwright/test (dev) | 6.0 / 1.65 | Apache-2.0 | TypeScript held at 6.0 for `typescript-eslint`                |
+
+Considered and not adopted: `skinview3d` (decision 1), `n8ao` (decision 9), `postprocessing` (Zlib; its
+peer range stops below three 0.188, and the built-in passes were enough), `electron-vite` and
+`vite-plugin-electron` (decision 12).

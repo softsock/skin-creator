@@ -9,7 +9,7 @@ Ordered by priority within each group. Items here are not implemented.
    (electron-builder or Forge) and a CI workflow running `pnpm check`, `pnpm test:e2e` and
    `pnpm desktop:smoke`.
 2. **Editing depth** – mirror painting across the body's symmetry plane, legacy 64×32 import (mirror the
-   right limbs with the face table), session autosave, a line/rectangle tool, selection and move.
+   right limbs with the face table and clear head overlays that were saved fully opaque), session autosave, a line/rectangle tool, selection and move.
 3. **Studio depth** – character posing (per-part pivots; picking must transform rays into part space),
    scene presets that bundle pose, camera and lighting, custom backdrop colour or image, fixed-size and
    higher-resolution export.
