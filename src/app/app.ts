@@ -10,7 +10,7 @@ import { Registry } from '../extensions/registry';
 import { detectPlatform } from '../platform/platform';
 import { STUDIO_PRESETS, type LightingPreset } from '../renderer/lighting';
 import type { SkinViewport } from '../renderer/viewport';
-import { useUi, type SlotId, type ViewKind } from '../ui/store';
+import { useUi, type ViewKind } from '../ui/store';
 
 // the one editor instance of the running application
 export const editor = new Editor({
@@ -37,16 +37,17 @@ export const extensions = new ExtensionHost({ editor, tools, panels, actions, pr
 // host environment adapter chosen once at startup
 export const platform = detectPlatform();
 
-// live 3d viewports by view area, registered by their components so actions can reach them
-export const viewports = new Map<SlotId, SkinViewport>();
+// live 3d viewports by view tab id, registered by their components so actions can reach them
+export const viewports = new Map<string, SkinViewport>();
 
-// finds the viewport of a view area showing one of the given kinds, the active area first
+// finds the viewport of a view tab showing one of the given kinds, the active tab first
 export function viewportFor(kinds: readonly ViewKind[]): SkinViewport | null {
-  const { views, activeSlot } = useUi.getState();
-  const order: SlotId[] = activeSlot === 'a' ? ['a', 'b'] : ['b', 'a'];
-  for (const slot of order) {
-    const viewport = viewports.get(slot);
-    if (viewport && kinds.includes(views[slot])) return viewport;
+  const { views, activeView } = useUi.getState();
+  const ids = Object.keys(views).sort((a, b) => Number(b === activeView) - Number(a === activeView));
+  for (const id of ids) {
+    const viewport = viewports.get(id);
+    const kind = views[id];
+    if (viewport && kind && kinds.includes(kind)) return viewport;
   }
   return null;
 }

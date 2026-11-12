@@ -1,17 +1,14 @@
 import type { DockviewApi } from 'dockview-react';
-import { useUi, type SlotId } from './store';
+import { useUi, VIEW_LABELS, type ViewKind } from './store';
 
-// one dockable panel the workspace knows how to create
+// one fixed settings panel the workspace knows how to create
 export interface DockPanel {
   readonly id: string;
   readonly title: string;
-  readonly slot?: SlotId;
 }
 
-// every panel of the workspace, also the order of the view menu
+// every settings panel of the workspace, also the order of the view menu
 export const DOCK_PANELS: readonly DockPanel[] = [
-  { id: 'view-a', title: 'View 1', slot: 'a' },
-  { id: 'view-b', title: 'View 2', slot: 'b' },
   { id: 'tools', title: 'Tools' },
   { id: 'brush', title: 'Tool settings' },
   { id: 'parts', title: 'Body parts' },
@@ -22,17 +19,24 @@ export const DOCK_PANELS: readonly DockPanel[] = [
 ];
 
 // storage key for the arrangement the user last left the panels in
-const LAYOUT_KEY = 'skin-studio.layout.v1';
+const LAYOUT_KEY = 'skin-studio.layout.v2';
+
+// id prefix that tells view tabs apart from the fixed settings panels
+const VIEW_PREFIX = 'view-';
 
 // the live dock, set once the layout component is ready
 let dock: DockviewApi | null = null;
 
-// creation options shared by every way a panel gets added
+// creation options of a settings panel
 function panelOptions(id: string) {
   const panel = DOCK_PANELS.find((item) => item.id === id)!;
-  return panel.slot
-    ? { id, title: panel.title, component: 'view', params: { slot: panel.slot }, renderer: 'always' as const }
-    : { id, title: panel.title, component: id };
+  return { id, title: panel.title, component: id };
+}
+
+// records the kind of a new view tab and returns its creation options, kept alive while hidden
+function viewOptions(id: string, kind: ViewKind) {
+  useUi.getState().setView(id, kind);
+  return { id, title: VIEW_LABELS[kind], component: 'view', renderer: 'always' as const };
 }
 
 // widths of the side columns in a fresh layout, the two views share what is left
@@ -42,28 +46,31 @@ const SIDE_WIDTHS = { left: 276, right: 292 };
 function buildDefaultLayout(api: DockviewApi): void {
   const place = (id: string, referencePanel: string, direction: 'left' | 'right' | 'below' | 'within') =>
     api.addPanel({ ...panelOptions(id), position: { referencePanel, direction } });
-  api.addPanel(panelOptions('view-a'));
+  api.addPanel(viewOptions('view-1', '3d'));
   api.addPanel({
     ...panelOptions('tools'),
-    position: { referencePanel: 'view-a', direction: 'left' },
+    position: { referencePanel: 'view-1', direction: 'left' },
     initialWidth: SIDE_WIDTHS.left,
   });
   place('brush', 'tools', 'below');
   place('parts', 'brush', 'below');
   api.addPanel({
     ...panelOptions('color'),
-    position: { referencePanel: 'view-a', direction: 'right' },
+    position: { referencePanel: 'view-1', direction: 'right' },
     initialWidth: SIDE_WIDTHS.right,
   });
   place('palette', 'color', 'below');
   place('plugins', 'palette', 'below');
   place('render', 'plugins', 'within');
-  place('view-b', 'view-a', 'right');
+  api.addPanel({
+    ...viewOptions('view-2', 'parts'),
+    position: { referencePanel: 'view-1', direction: 'right' },
+  });
   const pin = (id: string, minimumWidth: number, maximumWidth: number) =>
     api.getPanel(id)?.group.api.setConstraints({ minimumWidth, maximumWidth });
   pin('tools', SIDE_WIDTHS.left, SIDE_WIDTHS.left);
   pin('color', SIDE_WIDTHS.right, SIDE_WIDTHS.right);
-  api.getPanel('view-b')?.api.setSize({ width: (api.width - SIDE_WIDTHS.left - SIDE_WIDTHS.right) / 2 });
+  api.getPanel('view-2')?.api.setSize({ width: (api.width - SIDE_WIDTHS.left - SIDE_WIDTHS.right) / 2 });
   pin('tools', 180, Number.MAX_SAFE_INTEGER);
   pin('color', 180, Number.MAX_SAFE_INTEGER);
   api.getPanel('tools')?.api.setSize({ height: 148 });
@@ -71,23 +78,24 @@ function buildDefaultLayout(api: DockviewApi): void {
   api.getPanel('color')?.api.setSize({ height: 232 });
   api.getPanel('palette')?.api.setSize({ height: 176 });
   api.getPanel('plugins')?.api.setActive();
-  api.getPanel('view-a')?.api.setActive();
+  api.getPanel('view-1')?.api.setActive();
 }
 
-// mirrors which panels exist into the ui store and keeps the active view area valid
+// mirrors which panels and view tabs exist into the ui store and keeps the active view valid
 function syncOpenPanels(api: DockviewApi): void {
   const openPanels = api.panels.map((panel) => panel.id);
-  const { activeSlot, set } = useUi.getState();
-  const other: SlotId = activeSlot === 'a' ? 'b' : 'a';
-  const fallback = !openPanels.includes(`view-${activeSlot}`) && openPanels.includes(`view-${other}`);
-  set({ openPanels, ...(fallback ? { activeSlot: other } : {}) });
+  const viewIds = openPanels.filter((id) => id.startsWith(VIEW_PREFIX));
+  const { views, activeView, set } = useUi.getState();
+  set({
+    openPanels,
+    views: Object.fromEntries(viewIds.map((id) => [id, views[id] ?? '3d'])),
+    activeView: activeView && viewIds.includes(activeView) ? activeView : (viewIds[0] ?? null),
+  });
 }
 
 // connects the dock to persistence and the store, restoring the saved layout when there is one
 export function attachDock(api: DockviewApi): void {
   dock = api;
-  api.onDidAddPanel(() => syncOpenPanels(api));
-  api.onDidRemovePanel(() => syncOpenPanels(api));
   let restored = false;
   try {
     const saved = localStorage.getItem(LAYOUT_KEY);
@@ -101,28 +109,35 @@ export function attachDock(api: DockviewApi): void {
   }
   if (!restored) buildDefaultLayout(api);
   syncOpenPanels(api);
+  api.onDidAddPanel(() => syncOpenPanels(api));
+  api.onDidRemovePanel(() => syncOpenPanels(api));
   api.onDidLayoutChange(() => localStorage.setItem(LAYOUT_KEY, JSON.stringify(api.toJSON())));
 }
 
-// brings a panel to the front, recreating it when the user closed it earlier
+// brings a panel or view tab to the front, recreating a settings panel the user closed earlier
 export function showPanel(id: string): void {
   if (!dock) return;
   const existing = dock.getPanel(id);
-  if (existing) {
-    existing.api.setActive();
+  if (existing) existing.api.setActive();
+  else if (!id.startsWith(VIEW_PREFIX)) {
+    dock.addPanel({ ...panelOptions(id), floating: { width: 300, height: 380 } });
+  }
+}
+
+// opens a new view tab of the given kind in a dock group, by default next to the active view
+export function addView(kind: ViewKind, groupId?: string): void {
+  if (!dock) return;
+  const ui = useUi.getState();
+  if (ui.webglError && (kind === '3d' || kind === 'render')) {
+    ui.notify('error', 'This view needs WebGL, which is unavailable here.');
     return;
   }
-  const options = panelOptions(id);
-  if (!('params' in options)) {
-    dock.addPanel({ ...options, floating: { width: 300, height: 380 } });
-    return;
-  }
-  const sibling = dock.getPanel(id === 'view-a' ? 'view-b' : 'view-a');
+  let index = 1;
+  while (dock.getPanel(`${VIEW_PREFIX}${index}`)) index++;
+  const referenceGroup = groupId ?? (ui.activeView ? dock.getPanel(ui.activeView)?.group.id : undefined);
   dock.addPanel({
-    ...options,
-    position: sibling
-      ? { referencePanel: sibling.id, direction: id === 'view-a' ? 'left' : 'right' }
-      : { direction: 'left' },
+    ...viewOptions(`${VIEW_PREFIX}${index}`, kind),
+    ...(referenceGroup ? { position: { referenceGroup } } : {}),
   });
 }
 

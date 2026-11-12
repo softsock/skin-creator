@@ -5,15 +5,15 @@ import type { PixelTarget } from '../editor/tool';
 import { getSkinFaces, type LayerId } from '../core/skin-layout';
 import { EDITOR_LIGHTING } from '../renderer/lighting';
 import { SkinViewport, type ViewportLook } from '../renderer/viewport';
-import { useUi, type SlotId } from './store';
+import { useUi, type ViewKind } from './store';
 
 // field of view used while editing, wider than studio for comfortable close-up painting
 const EDIT_FOV = 35;
 
-// derives the look of one view area from ui state, the only difference between 3d and render views
-function lookOf(slot: SlotId): ViewportLook {
+// derives the look of one view tab from ui state, the only difference between 3d and render views
+function lookOf(id: string): ViewportLook {
   const { views, studio } = useUi.getState();
-  if (views[slot] !== 'render') return { lighting: EDITOR_LIGHTING, fov: EDIT_FOV, transparent: false };
+  if (views[id] !== 'render') return { lighting: EDITOR_LIGHTING, fov: EDIT_FOV, transparent: false };
   const preset = presets.get(studio.presetId) ?? presets.list()[0] ?? EDITOR_LIGHTING;
   return {
     lighting: {
@@ -27,30 +27,30 @@ function lookOf(slot: SlotId): ViewportLook {
   };
 }
 
-// hosts one three.js viewport for a view area and translates pointer input into tool strokes
-export function Viewport3D({ slot }: { slot: SlotId }) {
+// hosts one three.js viewport for a view tab and translates pointer input into tool strokes
+export function Viewport3D({ id }: { id: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const render = useUi((state) => state.views[slot] === 'render');
-  const transparent = useUi((state) => state.views[slot] === 'render' && state.studio.transparent);
+  const render = useUi((state) => state.views[id] === 'render');
+  const transparent = useUi((state) => state.views[id] === 'render' && state.studio.transparent);
   const webglError = useUi((state) => state.webglError);
 
   useEffect(() => {
     const container = containerRef.current!;
-    const painting = () => useUi.getState().views[slot] === '3d';
+    const painting = () => useUi.getState().views[id] === '3d';
     let viewport: SkinViewport;
     try {
-      viewport = new SkinViewport(container, editor, lookOf(slot));
+      viewport = new SkinViewport(container, editor, lookOf(id));
     } catch (error) {
       console.error(error);
       const { views, set } = useUi.getState();
-      const flat = (kind: (typeof views)[SlotId]) => (kind === '3d' || kind === 'render' ? '2d' : kind);
+      const flat = (kind: ViewKind): ViewKind => (kind === '3d' || kind === 'render' ? '2d' : kind);
       set({
         webglError: error instanceof Error ? error.message : String(error),
-        views: { a: flat(views.a), b: flat(views.b) },
+        views: Object.fromEntries(Object.entries(views).map(([key, kind]) => [key, flat(kind)])),
       });
       return;
     }
-    viewports.set(slot, viewport);
+    viewports.set(id, viewport);
     viewport.setVisibility(useUi.getState().visibility);
     const canvas = viewport.canvas;
     let strokeLayer: LayerId | null = null;
@@ -99,18 +99,18 @@ export function Viewport3D({ slot }: { slot: SlotId }) {
     canvas.addEventListener('contextmenu', onContextMenu);
 
     const sizeObserver = new ResizeObserver(() =>
-      useUi.getState().set({ viewportSize: `${slot}:${container.clientWidth}x${container.clientHeight}` }),
+      useUi.getState().set({ viewportSize: `${id}:${container.clientWidth}x${container.clientHeight}` }),
     );
     sizeObserver.observe(container);
 
     const unsubscribe = useUi.subscribe((state, previous) => {
-      const kindChanged = state.views[slot] !== previous.views[slot];
-      if (kindChanged || (state.studio !== previous.studio && state.views[slot] === 'render')) {
-        viewport.setLook(lookOf(slot), true);
+      const kindChanged = state.views[id] !== previous.views[id];
+      if (kindChanged || (state.studio !== previous.studio && state.views[id] === 'render')) {
+        viewport.setLook(lookOf(id), true);
       }
       if (state.visibility !== previous.visibility) viewport.setVisibility(state.visibility);
       if (state.hover !== previous.hover || kindChanged) {
-        const hover = state.views[slot] === '3d' ? state.hover : null;
+        const hover = state.views[id] === '3d' ? state.hover : null;
         const face = hover && getSkinFaces(editor.skin.model)[hover.faceIndex];
         viewport.setHover(hover && face ? { face, x: hover.x, y: hover.y } : null);
       }
@@ -119,10 +119,10 @@ export function Viewport3D({ slot }: { slot: SlotId }) {
     return () => {
       unsubscribe();
       sizeObserver.disconnect();
-      viewports.delete(slot);
+      viewports.delete(id);
       viewport.dispose();
     };
-  }, [slot]);
+  }, [id]);
 
   if (webglError) {
     return (
